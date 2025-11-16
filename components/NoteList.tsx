@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { getAllNotes } from '@/lib/storage';
 import type { Note } from '@/types/note';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { format } from 'date-fns';
 
