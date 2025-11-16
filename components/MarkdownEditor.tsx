@@ -20,6 +20,8 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
       }),
     ],
     content,
+    editable: true,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
