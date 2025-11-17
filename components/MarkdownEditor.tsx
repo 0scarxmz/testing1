@@ -4,14 +4,18 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect } from 'react';
+import { htmlToMarkdown, contentToHtml, normalizeToMarkdown } from '@/lib/markdown';
 
 interface MarkdownEditorProps {
-  content: string;
-  onChange: (content: string) => void;
+  content: string; // Can be Markdown or HTML (for backward compatibility)
+  onChange: (content: string) => void; // Always receives Markdown format
   placeholder?: string;
 }
 
 export function MarkdownEditor({ content, onChange, placeholder = 'Start writing...' }: MarkdownEditorProps) {
+  // Normalize content to Markdown (convert HTML if needed)
+  const markdownContent = normalizeToMarkdown(content);
+  
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -19,11 +23,14 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
         placeholder,
       }),
     ],
-    content,
+    content: markdownContent ? contentToHtml(markdownContent) : '',
     editable: true,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      // Convert HTML from TipTap to Markdown before saving
+      const html = editor.getHTML();
+      const markdown = htmlToMarkdown(html);
+      onChange(markdown);
     },
     editorProps: {
       attributes: {
@@ -33,8 +40,14 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content);
+    if (editor) {
+      // Normalize to Markdown first (handles old HTML content)
+      const normalized = normalizeToMarkdown(content);
+      // Convert to HTML for TipTap to display
+      const html = contentToHtml(normalized);
+      if (html !== editor.getHTML()) {
+        editor.commands.setContent(html);
+      }
     }
   }, [content, editor]);
 

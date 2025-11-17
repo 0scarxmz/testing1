@@ -6,10 +6,26 @@ import type { Note } from '@/types/note';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { markdownToHtml } from '@/lib/markdown';
 
-// Helper function to strip HTML tags and get plain text
+// Helper function to get plain text from Markdown or HTML
 // Uses regex to avoid hydration mismatches between server and client
-function stripHtml(html: string): string {
+function getPlainText(content: string): string {
+  // First, try to convert markdown to HTML, then strip HTML tags
+  // This handles both old HTML content and new Markdown content
+  let html = content;
+  
+  // If it looks like markdown (has markdown syntax), convert it
+  if (content.includes('**') || content.includes('*') || content.includes('#') || content.includes('`')) {
+    try {
+      html = markdownToHtml(content);
+    } catch (e) {
+      // If conversion fails, use content as-is
+      html = content;
+    }
+  }
+  
+  // Strip HTML tags
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
@@ -60,7 +76,7 @@ export function NoteList() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                {stripHtml(note.content)}
+                {getPlainText(note.content)}
               </p>
               {note.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
