@@ -7,6 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { format } from 'date-fns';
 
+// Helper function to strip HTML tags and get plain text
+// Uses regex to avoid hydration mismatches between server and client
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
 export function NoteList() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +60,7 @@ export function NoteList() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                {note.content}
+                {stripHtml(note.content)}
               </p>
               {note.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
