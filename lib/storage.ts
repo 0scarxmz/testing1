@@ -1,10 +1,11 @@
 import { getDB } from './db';
 import type { Note, Relationship, NoteSearchResult } from '@/types/note';
 import { generateEmbedding, cosineSimilarity } from './embeddings';
+import { generateUUID } from './utils';
 
 export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
   const db = await getDB();
-  const id = crypto.randomUUID();
+  const id = generateUUID();
   const now = Date.now();
 
   const newNote: Note = {
@@ -88,7 +89,7 @@ export async function searchNotesByText(query: string): Promise<Note[]> {
 // Relationship operations
 export async function createRelationship(relationship: Omit<Relationship, 'id' | 'createdAt'>): Promise<Relationship> {
   const db = await getDB();
-  const id = crypto.randomUUID();
+  const id = generateUUID();
   const now = Date.now();
 
   const newRelationship: Relationship = {

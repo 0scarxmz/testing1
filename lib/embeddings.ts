@@ -7,10 +7,20 @@ import OpenAI from 'openai';
 
 const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true, // Required for client-side usage
-});
+/**
+ * Get or create OpenAI client instance
+ * Initialized lazily to avoid errors when API key is not set
+ */
+function getOpenAIClient(): OpenAI {
+  if (!OPENAI_API_KEY) {
+    throw new Error('NEXT_PUBLIC_OPENAI_API_KEY environment variable is not set');
+  }
+  
+  return new OpenAI({
+    apiKey: OPENAI_API_KEY,
+    dangerouslyAllowBrowser: true, // Required for client-side usage
+  });
+}
 
 /**
  * Generate embedding for text using OpenAI API
@@ -19,7 +29,7 @@ const openai = new OpenAI({
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY environment variable is not set');
+    throw new Error('NEXT_PUBLIC_OPENAI_API_KEY environment variable is not set');
   }
 
   if (!text || text.trim().length === 0) {
@@ -27,6 +37,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   try {
+    const openai = getOpenAIClient();
     const response = await openai.embeddings.create({
       model: 'text-embedding-3-small',
       input: text.trim(),
