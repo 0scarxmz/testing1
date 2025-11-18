@@ -12,10 +12,13 @@ interface SidebarProps {
   onTagClick?: (tag: string) => void;
 }
 
+type SearchMode = 'keyword' | 'semantic';
+
 export function Sidebar({ onTagClick }: SidebarProps) {
   const [tags, setTags] = useState<string[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('keyword');
   const pathname = usePathname();
 
   useEffect(() => {
@@ -55,7 +58,11 @@ export function Sidebar({ onTagClick }: SidebarProps) {
 
   return (
     <div className="w-80 border-r bg-background flex flex-col h-screen">
-      <SidebarSearch onSearchChange={setSearchQuery} />
+      <SidebarSearch 
+        onSearchChange={setSearchQuery} 
+        onModeChange={setSearchMode}
+        searchMode={searchMode}
+      />
       
       <div className="flex-1 overflow-y-auto">
         {tags.length > 0 && (
@@ -103,6 +110,7 @@ export function Sidebar({ onTagClick }: SidebarProps) {
           <NoteList 
             searchQuery={searchQuery} 
             activeTag={activeTag} 
+            searchMode={searchMode}
             onTagClick={handleTagClick}
             onNotesChange={loadTags}
           />

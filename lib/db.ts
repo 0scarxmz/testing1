@@ -10,7 +10,7 @@ interface NotesDB extends DBSchema {
       tags: string[];
       createdAt: number;
       updatedAt: number;
-      embedding?: number[];
+      embedding: number[] | null;
     };
     indexes: { 'by-created': number; 'by-updated': number; 'by-tag': string };
   };

@@ -5,7 +5,7 @@ export interface Note {
   tags: string[];
   createdAt: number;
   updatedAt: number;
-  embedding?: number[]; // Vector embedding for semantic search
+  embedding: number[] | null; // Vector embedding for semantic search
 }
 
 export interface Tag {

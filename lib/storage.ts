@@ -1,5 +1,6 @@
 import { getDB } from './db';
-import type { Note, Relationship } from '@/types/note';
+import type { Note, Relationship, NoteSearchResult } from '@/types/note';
+import { generateEmbedding, cosineSimilarity } from './embeddings';
 
 export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
   const db = await getDB();
@@ -122,5 +123,93 @@ export async function getAllTags(): Promise<string[]> {
   });
   
   return Array.from(tagSet).sort();
+}
+
+/**
+ * Semantic search using vector embeddings and cosine similarity
+ * @param query - Search query text
+ * @returns Array of notes with similarity scores, sorted by relevance
+ */
+export async function searchNotesSemantic(query: string): Promise<NoteSearchResult[]> {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+
+  try {
+    // Generate embedding for search query
+    const queryEmbedding = await generateEmbedding(query);
+
+    // Get all notes with embeddings
+    const db = await getDB();
+    const allNotes = await db.getAll('notes');
+    const notesWithEmbeddings = allNotes.filter(note => note.embedding !== null && note.embedding !== undefined);
+
+    if (notesWithEmbeddings.length === 0) {
+      return [];
+    }
+
+    // Calculate similarity scores
+    const results: NoteSearchResult[] = notesWithEmbeddings.map(note => {
+      const similarity = cosineSimilarity(queryEmbedding, note.embedding!);
+      return {
+        note,
+        score: similarity,
+      };
+    });
+
+    // Sort by similarity score (highest first)
+    results.sort((a, b) => b.score - a.score);
+
+    return results;
+  } catch (error) {
+    console.error('Semantic search failed:', error);
+    return [];
+  }
+}
+
+/**
+ * Get related notes based on embedding similarity
+ * @param noteId - ID of the note to find related notes for
+ * @param limit - Maximum number of related notes to return (default: 3)
+ * @returns Array of related notes with similarity scores
+ */
+export async function getRelatedNotes(noteId: string, limit: number = 3): Promise<NoteSearchResult[]> {
+  try {
+    // Get current note
+    const currentNote = await getNote(noteId);
+    
+    if (!currentNote || !currentNote.embedding) {
+      return [];
+    }
+
+    // Get all other notes with embeddings
+    const db = await getDB();
+    const allNotes = await db.getAll('notes');
+    const otherNotes = allNotes.filter(
+      note => note.id !== noteId && note.embedding !== null && note.embedding !== undefined
+    );
+
+    if (otherNotes.length === 0) {
+      return [];
+    }
+
+    // Calculate similarity scores
+    const results: NoteSearchResult[] = otherNotes.map(note => {
+      const similarity = cosineSimilarity(currentNote.embedding!, note.embedding!);
+      return {
+        note,
+        score: similarity,
+      };
+    });
+
+    // Sort by similarity score (highest first)
+    results.sort((a, b) => b.score - a.score);
+
+    // Return top N results
+    return results.slice(0, limit);
+  } catch (error) {
+    console.error('Failed to get related notes:', error);
+    return [];
+  }
 }
 

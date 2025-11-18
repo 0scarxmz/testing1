@@ -11,6 +11,8 @@ import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { extractTags } from '@/lib/tags';
 import { TagInput } from '@/components/tag-input';
+import { generateEmbedding } from '@/lib/embeddings';
+import { RelatedNotes } from '@/components/RelatedNotes';
 
 export default function NotePage() {
   const params = useParams();
@@ -65,12 +67,25 @@ export default function NotePage() {
       const extractedTags = extractTags(content);
       const allTags = [...new Set([...tags, ...extractedTags])];
 
+      // Generate embedding from title + content
+      let embedding: number[] | null = null;
+      const noteText = `${title || 'Untitled'}\n\n${content}`;
+      if (noteText.trim().length > 0) {
+        try {
+          embedding = await generateEmbedding(noteText);
+        } catch (error) {
+          console.error('Failed to generate embedding:', error);
+          // Don't block save if embedding fails
+        }
+      }
+
       if (isNew) {
         const { createNote } = await import('@/lib/storage');
         const newNote = await createNote({
           title: title || 'Untitled',
           content,
           tags: allTags,
+          embedding,
         });
         router.push(`/notes/${newNote.id}`);
         router.refresh();
@@ -79,6 +94,7 @@ export default function NotePage() {
           title: title || 'Untitled',
           content,
           tags: allTags,
+          embedding,
         });
         router.refresh();
       }
@@ -143,6 +159,9 @@ export default function NotePage() {
             <TagInput tags={tags} onChange={setTags} placeholder="Add tag..." />
           </div>
           <MarkdownEditor content={content} onChange={setContent} />
+          {!isNew && note && note.embedding && (
+            <RelatedNotes noteId={note.id} />
+          )}
         </div>
       </main>
     </div>

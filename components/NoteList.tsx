@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { getAllNotes } from '@/lib/storage';
+import { getAllNotes, searchNotesByText, searchNotesSemantic } from '@/lib/storage';
 import type { Note } from '@/types/note';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -29,16 +29,20 @@ function getPlainText(content: string): string {
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
+type SearchMode = 'keyword' | 'semantic';
+
 interface NoteListProps {
   searchQuery?: string;
   activeTag?: string | null;
+  searchMode?: SearchMode;
   onTagClick?: (tag: string) => void;
   onNotesChange?: () => void;
 }
 
-export function NoteList({ searchQuery = '', activeTag = null, onTagClick, onNotesChange }: NoteListProps) {
+export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'keyword', onTagClick, onNotesChange }: NoteListProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     loadNotes();
@@ -61,25 +65,60 @@ export function NoteList({ searchQuery = '', activeTag = null, onTagClick, onNot
   }
 
   const filteredNotes = useMemo(() => {
-    let filtered = notes;
+    return notes;
+  }, [notes]);
 
-    // First apply tag filter if active
+  // Handle search separately to support async semantic search
+  const [searchResults, setSearchResults] = useState<Note[]>([]);
+
+  useEffect(() => {
+    async function performSearch() {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        setSearching(false);
+        return;
+      }
+
+      setSearching(true);
+      try {
+        let results: Note[] = [];
+        
+        if (searchMode === 'semantic') {
+          const semanticResults = await searchNotesSemantic(searchQuery);
+          results = semanticResults.map(r => r.note);
+        } else {
+          results = await searchNotesByText(searchQuery);
+        }
+
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search failed:', error);
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }
+
+    performSearch();
+  }, [searchQuery, searchMode]);
+
+  // Combine filters: tag filter first, then search
+  const displayNotes = useMemo(() => {
+    let filtered = filteredNotes;
+
+    // Apply tag filter if active
     if (activeTag) {
       filtered = filtered.filter(n => n.tags.includes(activeTag));
     }
 
-    // Then apply search filter within the tag-filtered results
-    if (searchQuery.trim()) {
-      const lower = searchQuery.toLowerCase();
-      filtered = filtered.filter(note => 
-        note.title.toLowerCase().includes(lower) || 
-        note.content.toLowerCase().includes(lower) ||
-        note.tags.some(tag => tag.toLowerCase().includes(lower))
-      );
+    // Apply search filter within tag-filtered results
+    if (searchQuery.trim() && searchResults.length > 0) {
+      const searchResultIds = new Set(searchResults.map(n => n.id));
+      filtered = filtered.filter(n => searchResultIds.has(n.id));
     }
 
     return filtered;
-  }, [notes, activeTag, searchQuery]);
+  }, [filteredNotes, activeTag, searchQuery, searchResults]);
 
   function handleTagClick(e: React.MouseEvent, tag: string) {
     e.preventDefault();
@@ -102,7 +141,15 @@ export function NoteList({ searchQuery = '', activeTag = null, onTagClick, onNot
     );
   }
 
-  if (filteredNotes.length === 0) {
+  if (searching) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <p className="text-muted-foreground">Searching...</p>
+      </div>
+    );
+  }
+
+  if (displayNotes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <h2 className="text-2xl font-semibold mb-2">No notes found</h2>
@@ -115,7 +162,7 @@ export function NoteList({ searchQuery = '', activeTag = null, onTagClick, onNot
 
   return (
     <div className="grid gap-4 p-2">
-      {filteredNotes.map((note) => (
+      {displayNotes.map((note) => (
         <Link key={note.id} href={`/notes/${note.id}`}>
           <Card className="hover:bg-accent transition-colors cursor-pointer">
             <CardHeader>
