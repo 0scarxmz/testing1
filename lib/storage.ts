@@ -112,3 +112,15 @@ export async function getNoteRelationships(noteId: string): Promise<Relationship
   return [...sourceRelations, ...targetRelations];
 }
 
+export async function getAllTags(): Promise<string[]> {
+  const db = await getDB();
+  const allNotes = await db.getAll('notes');
+  const tagSet = new Set<string>();
+  
+  allNotes.forEach(note => {
+    note.tags.forEach(tag => tagSet.add(tag));
+  });
+  
+  return Array.from(tagSet).sort();
+}
+

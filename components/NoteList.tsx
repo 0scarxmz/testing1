@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getAllNotes } from '@/lib/storage';
 import type { Note } from '@/types/note';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,7 +29,14 @@ function getPlainText(content: string): string {
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
-export function NoteList() {
+interface NoteListProps {
+  searchQuery?: string;
+  activeTag?: string | null;
+  onTagClick?: (tag: string) => void;
+  onNotesChange?: () => void;
+}
+
+export function NoteList({ searchQuery = '', activeTag = null, onTagClick, onNotesChange }: NoteListProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,10 +50,42 @@ export function NoteList() {
       // Sort by updatedAt, most recent first
       const sorted = allNotes.sort((a, b) => b.updatedAt - a.updatedAt);
       setNotes(sorted);
+      if (onNotesChange) {
+        onNotesChange();
+      }
     } catch (error) {
       console.error('Failed to load notes:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  const filteredNotes = useMemo(() => {
+    let filtered = notes;
+
+    // First apply tag filter if active
+    if (activeTag) {
+      filtered = filtered.filter(n => n.tags.includes(activeTag));
+    }
+
+    // Then apply search filter within the tag-filtered results
+    if (searchQuery.trim()) {
+      const lower = searchQuery.toLowerCase();
+      filtered = filtered.filter(note => 
+        note.title.toLowerCase().includes(lower) || 
+        note.content.toLowerCase().includes(lower) ||
+        note.tags.some(tag => tag.toLowerCase().includes(lower))
+      );
+    }
+
+    return filtered;
+  }, [notes, activeTag, searchQuery]);
+
+  function handleTagClick(e: React.MouseEvent, tag: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onTagClick) {
+      onTagClick(tag);
     }
   }
 
@@ -63,9 +102,20 @@ export function NoteList() {
     );
   }
 
+  if (filteredNotes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <h2 className="text-2xl font-semibold mb-2">No notes found</h2>
+        <p className="text-muted-foreground mb-4">
+          {searchQuery || activeTag ? 'Try adjusting your filters' : 'Create your first note to get started'}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-4 p-4">
-      {notes.map((note) => (
+    <div className="grid gap-4 p-2">
+      {filteredNotes.map((note) => (
         <Link key={note.id} href={`/notes/${note.id}`}>
           <Card className="hover:bg-accent transition-colors cursor-pointer">
             <CardHeader>
@@ -81,12 +131,13 @@ export function NoteList() {
               {note.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {note.tags.map((tag) => (
-                    <span
+                    <button
                       key={tag}
-                      className="text-xs px-2 py-1 bg-secondary rounded-md"
+                      onClick={(e) => handleTagClick(e, tag)}
+                      className="text-xs px-2 py-1 bg-secondary rounded-md hover:bg-secondary/80 transition-colors"
                     >
-                      {tag}
-                    </span>
+                      #{tag}
+                    </button>
                   ))}
                 </div>
               )}

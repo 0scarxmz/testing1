@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { extractTags } from '@/lib/tags';
+import { TagInput } from '@/components/tag-input';
 
 export default function NotePage() {
   const params = useParams();
@@ -60,6 +61,7 @@ export default function NotePage() {
 
     setSaving(true);
     try {
+      // Use manual tags, but also merge with auto-extracted tags
       const extractedTags = extractTags(content);
       const allTags = [...new Set([...tags, ...extractedTags])];
 
@@ -137,18 +139,9 @@ export default function NotePage() {
             onChange={(e) => setTitle(e.target.value)}
             className="text-2xl font-bold border-0 focus-visible:ring-0 shadow-none"
           />
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs px-2 py-1 bg-secondary rounded-md"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          <div>
+            <TagInput tags={tags} onChange={setTags} placeholder="Add tag..." />
+          </div>
           <MarkdownEditor content={content} onChange={setContent} />
         </div>
       </main>
