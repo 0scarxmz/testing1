@@ -1,6 +1,6 @@
 import { getDB } from './db';
 import type { Note, Relationship, NoteSearchResult } from '@/types/note';
-import { generateEmbedding, cosineSimilarity } from './embeddings';
+import { generateEmbedding, cosineSimilarity, isEmbeddingAvailable } from './embeddings';
 import { generateUUID } from './utils';
 
 export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
@@ -136,6 +136,12 @@ export async function searchNotesSemantic(query: string): Promise<NoteSearchResu
     return [];
   }
 
+  // Check if embeddings are available before attempting to generate
+  if (!isEmbeddingAvailable()) {
+    console.warn('Semantic search unavailable: OpenAI API key not configured');
+    return [];
+  }
+
   try {
     // Generate embedding for search query
     const queryEmbedding = await generateEmbedding(query);
@@ -146,8 +152,11 @@ export async function searchNotesSemantic(query: string): Promise<NoteSearchResu
     const notesWithEmbeddings = allNotes.filter(note => note.embedding !== null && note.embedding !== undefined);
 
     if (notesWithEmbeddings.length === 0) {
+      console.warn('Semantic search: No notes with embeddings found. Save some notes first to generate embeddings.');
       return [];
     }
+
+    console.log(`Semantic search: Found ${notesWithEmbeddings.length} notes with embeddings out of ${allNotes.length} total notes`);
 
     // Calculate similarity scores
     const results: NoteSearchResult[] = notesWithEmbeddings.map(note => {

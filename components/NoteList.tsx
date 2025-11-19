@@ -84,7 +84,9 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
         let results: Note[] = [];
         
         if (searchMode === 'semantic') {
+          console.log('Performing semantic search for:', searchQuery);
           const semanticResults = await searchNotesSemantic(searchQuery);
+          console.log('Semantic search results:', semanticResults.length, 'notes found');
           results = semanticResults.map(r => r.note);
         } else {
           results = await searchNotesByText(searchQuery);
@@ -112,9 +114,14 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
     }
 
     // Apply search filter within tag-filtered results
-    if (searchQuery.trim() && searchResults.length > 0) {
-      const searchResultIds = new Set(searchResults.map(n => n.id));
-      filtered = filtered.filter(n => searchResultIds.has(n.id));
+    if (searchQuery.trim()) {
+      if (searchResults.length > 0) {
+        const searchResultIds = new Set(searchResults.map(n => n.id));
+        filtered = filtered.filter(n => searchResultIds.has(n.id));
+      } else {
+        // No search results, so filter to empty array to show "No notes found"
+        filtered = [];
+      }
     }
 
     return filtered;

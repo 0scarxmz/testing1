@@ -5,7 +5,15 @@
 
 import OpenAI from 'openai';
 
-const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+/**
+ * Check if OpenAI API key is available for generating embeddings
+ * @returns true if API key is set, false otherwise
+ */
+export function isEmbeddingAvailable(): boolean {
+  return !!OPENAI_API_KEY;
+}
 
 /**
  * Get or create OpenAI client instance
@@ -13,12 +21,11 @@ const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
  */
 function getOpenAIClient(): OpenAI {
   if (!OPENAI_API_KEY) {
-    throw new Error('NEXT_PUBLIC_OPENAI_API_KEY environment variable is not set');
+    throw new Error('OPENAI_API_KEY environment variable is not set');
   }
   
   return new OpenAI({
     apiKey: OPENAI_API_KEY,
-    dangerouslyAllowBrowser: true, // Required for client-side usage
   });
 }
 
@@ -29,7 +36,7 @@ function getOpenAIClient(): OpenAI {
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!OPENAI_API_KEY) {
-    throw new Error('NEXT_PUBLIC_OPENAI_API_KEY environment variable is not set');
+    throw new Error('OPENAI_API_KEY environment variable is not set');
   }
 
   if (!text || text.trim().length === 0) {
@@ -86,3 +93,6 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / magnitude;
 }
 
+console.log('API Key check:', OPENAI_API_KEY ? 'Found' : 'Missing');
+
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);

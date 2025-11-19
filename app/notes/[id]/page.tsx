@@ -11,7 +11,7 @@ import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { extractTags } from '@/lib/tags';
 import { TagInput } from '@/components/tag-input';
-import { generateEmbedding } from '@/lib/embeddings';
+import { generateEmbedding, isEmbeddingAvailable } from '@/lib/embeddings';
 import { RelatedNotes } from '@/components/RelatedNotes';
 
 export default function NotePage() {
@@ -67,10 +67,10 @@ export default function NotePage() {
       const extractedTags = extractTags(content);
       const allTags = [...new Set([...tags, ...extractedTags])];
 
-      // Generate embedding from title + content
+      // Generate embedding from title + content (only if API key is available)
       let embedding: number[] | null = null;
       const noteText = `${title || 'Untitled'}\n\n${content}`;
-      if (noteText.trim().length > 0) {
+      if (noteText.trim().length > 0 && isEmbeddingAvailable()) {
         try {
           embedding = await generateEmbedding(noteText);
         } catch (error) {
