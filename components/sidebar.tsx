@@ -5,8 +5,9 @@ import { getAllTags } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { SidebarSearch } from './sidebar-search';
 import { NoteList } from './NoteList';
-import { X } from 'lucide-react';
+import { X, Network } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 interface SidebarProps {
   onTagClick?: (tag: string) => void;
@@ -58,6 +59,17 @@ export function Sidebar({ onTagClick }: SidebarProps) {
 
   return (
     <div className="w-80 border-r bg-background flex flex-col h-screen">
+      <div className="p-4 border-b">
+        <Link href="/graph">
+          <Button
+            variant={pathname === '/graph' ? 'default' : 'outline'}
+            className="w-full justify-start"
+          >
+            <Network className="mr-2 h-4 w-4" />
+            Graph
+          </Button>
+        </Link>
+      </div>
       <SidebarSearch 
         onSearchChange={setSearchQuery} 
         onModeChange={setSearchMode}
