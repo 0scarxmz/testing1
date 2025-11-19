@@ -1,13 +1,23 @@
 'use client';
 
-// IMPORTANT: Import AFRAME polyfill BEFORE react-force-graph
-// This ensures AFRAME exists when react-force-graph tries to access it
-import '@/lib/graph/aframe-polyfill';
-import '@/lib/graph/three-polyfill';
-
 import { useRouter } from 'next/navigation';
-import { ForceGraph2D } from 'react-force-graph';
+import dynamic from 'next/dynamic';
 import type { GraphData } from '@/lib/graph/buildGraphData';
+
+// Props for the ForceGraph2D wrapper
+type ForceGraph2DProps = {
+  graphData: GraphData;
+  nodeLabel?: string;
+  nodeAutoColorBy?: string;
+  onNodeClick?: (node: any) => void;
+};
+
+// IMPORTANT: only use react-force-graph-2d here, and load it dynamically
+const ForceGraph2D = dynamic<ForceGraph2DProps>(
+  () =>
+    import('react-force-graph-2d').then((mod: any) => mod.default ?? mod.ForceGraph2D),
+  { ssr: false }
+);
 
 interface GraphViewProps {
   data: GraphData;
@@ -22,9 +32,10 @@ export function GraphView({ data }: GraphViewProps) {
       nodeLabel="title"
       nodeAutoColorBy="group"
       onNodeClick={(node: any) => {
-        router.push(`/notes/${node.id}`);
+        if (node?.id) {
+          router.push(`/notes/${node.id}`);
+        }
       }}
     />
   );
 }
-
