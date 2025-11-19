@@ -4,24 +4,21 @@
 
 The error indicates that `better-sqlite3` was compiled for a different Node.js version than Electron uses.
 
-### Solution for Windows:
+### Solution (Already Applied):
 
-1. **Delete node_modules and rebuild:**
+**Electron has been downgraded to version 33.2.0** which is compatible with `better-sqlite3@12.4.1`.
+
+If you still encounter issues:
+
+1. **Rebuild better-sqlite3:**
+   ```bash
+   npm run rebuild:electron
+   ```
+
+2. **If that doesn't work, reinstall:**
    ```bash
    rm -rf node_modules
    npm install
-   npm run postinstall
-   ```
-
-2. **If that doesn't work, manually rebuild:**
-   ```bash
-   npx electron-rebuild -f -w better-sqlite3
-   ```
-
-3. **If rebuild fails, try using a compatible version:**
-   ```bash
-   npm install better-sqlite3@11.0.0 --save
-   npm run postinstall
    ```
 
 ## Issue 2: OPENAI_API_KEY Not Set

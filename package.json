@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-rebuild -f -w better-sqlite3 || echo 'Rebuild failed - this is OK if you are not using Electron. Run npm run rebuild:electron manually if needed.'",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "desktop:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron electron\"",
     "desktop:build": "next build && next start & wait-on http://localhost:3000 && electron electron"
   },
@@ -45,7 +46,7 @@
     "@types/turndown": "^5.0.6",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "electron": "^39.2.2",
+    "electron": "^33.2.0",
     "electron-rebuild": "^3.2.9",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
