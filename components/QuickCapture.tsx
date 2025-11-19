@@ -53,6 +53,7 @@ export function QuickCaptureProvider({ children }: { children: ReactNode }) {
         title,
         content,
         tags,
+        embedding: null, // Embedding will be generated later if needed
       });
 
       setInput('');
