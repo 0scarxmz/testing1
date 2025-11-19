@@ -1,17 +1,31 @@
 // Load environment variables from .env.local
 const dotenv = require('dotenv');
 const path = require('path');
-const envPath = path.join(__dirname, '../.env.local');
-const result = dotenv.config({ path: envPath });
 
-if (result.error) {
-  console.error('Error loading .env.local:', result.error);
-} else {
-  console.log('Loaded environment variables from:', envPath);
-  console.log('OPENAI_API_KEY loaded:', !!process.env.OPENAI_API_KEY);
-  if (process.env.OPENAI_API_KEY) {
-    console.log('OPENAI_API_KEY length:', process.env.OPENAI_API_KEY.length);
+// Try multiple possible locations for .env.local
+const possiblePaths = [
+  path.join(__dirname, '../.env.local'),
+  path.join(process.cwd(), '.env.local'),
+];
+
+let envLoaded = false;
+for (const envPath of possiblePaths) {
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    console.log('Loaded environment variables from:', envPath);
+    envLoaded = true;
+    break;
   }
+}
+
+if (!envLoaded) {
+  console.warn('Warning: .env.local not found. OpenAI API key may not be available.');
+  console.warn('Please create .env.local in the project root with: OPENAI_API_KEY=your-key');
+}
+
+console.log('OPENAI_API_KEY loaded:', !!process.env.OPENAI_API_KEY);
+if (process.env.OPENAI_API_KEY) {
+  console.log('OPENAI_API_KEY length:', process.env.OPENAI_API_KEY.length);
 }
 
 const { app, BrowserWindow, ipcMain } = require('electron');

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "desktop:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron electron\"",
     "desktop:build": "next build && next start & wait-on http://localhost:3000 && electron electron"
   },
