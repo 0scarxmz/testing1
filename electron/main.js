@@ -13,16 +13,20 @@ function createWindow() {
     },
   });
 
-  // Load the Next.js build output
-  const isDev = process.env.NODE_ENV === 'development';
+  // Determine if we're in development or production
+  const isDev = !app.isPackaged;
+  
+  // URLs for dev and production
+  const devUrl = "http://localhost:3000";
+  const prodUrl = `file://${path.join(__dirname, "../out/index.html")}`;
   
   if (isDev) {
     // In development, open dev tools
     win.webContents.openDevTools();
   }
 
-  // Load from the out directory
-  win.loadURL(`file://${path.join(__dirname, '../out/index.html')}`);
+  // Load from Next.js dev server or production build
+  win.loadURL(isDev ? devUrl : prodUrl);
 
   // Handle window closed
   win.on('closed', () => {
