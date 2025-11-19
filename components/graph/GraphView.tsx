@@ -1,15 +1,13 @@
 'use client';
 
-import { useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import type { GraphData } from '@/lib/graph/buildGraphData';
+// IMPORTANT: Import AFRAME polyfill BEFORE react-force-graph
+// This ensures AFRAME exists when react-force-graph tries to access it
+import '@/lib/graph/aframe-polyfill';
+import '@/lib/graph/three-polyfill';
 
-// Dynamically import react-force-graph to avoid SSR issues
-const ForceGraph2D = dynamic(
-  () => import('react-force-graph').then((mod) => mod.ForceGraph2D),
-  { ssr: false }
-);
+import { useRouter } from 'next/navigation';
+import { ForceGraph2D } from 'react-force-graph';
+import type { GraphData } from '@/lib/graph/buildGraphData';
 
 interface GraphViewProps {
   data: GraphData;
@@ -17,18 +15,16 @@ interface GraphViewProps {
 
 export function GraphView({ data }: GraphViewProps) {
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={containerRef} className="w-full h-full">
-      <ForceGraph2D
-        graphData={data}
-        nodeLabel="title"
-        onNodeClick={(node) => {
-          router.push(`/notes/${node.id}`);
-        }}
-      />
-    </div>
+    <ForceGraph2D
+      graphData={data}
+      nodeLabel="title"
+      nodeAutoColorBy="group"
+      onNodeClick={(node: any) => {
+        router.push(`/notes/${node.id}`);
+      }}
+    />
   );
 }
 

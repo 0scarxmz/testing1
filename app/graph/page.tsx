@@ -1,12 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/sidebar';
-import { GraphView } from '@/components/graph/GraphView';
 import { getAllNotes } from '@/lib/storage';
 import { buildGraphData } from '@/lib/graph/buildGraphData';
 import type { Note } from '@/types/note';
 import type { GraphData } from '@/lib/graph/buildGraphData';
+
+// Dynamically import GraphView with SSR disabled (required for react-force-graph)
+// Set up AFRAME and THREE polyfills before importing GraphView
+const GraphView = dynamic(
+  () => {
+    // Then import GraphView
+    return import('@/components/graph/GraphView').then((mod) => ({ default: mod.GraphView }));
+  },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Loading graph...</p>
+      </div>
+    ),
+  }
+);
 
 export default function GraphPage() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
