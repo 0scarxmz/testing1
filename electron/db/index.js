@@ -1,0 +1,149 @@
+const Database = require("better-sqlite3");
+const { drizzle } = require("drizzle-orm/better-sqlite3");
+const { notes } = require("./schema");
+const { eq } = require("drizzle-orm");
+const { app } = require("electron");
+const path = require("path");
+
+let dbInstance = null;
+let sqliteInstance = null;
+
+function getDatabase() {
+  if (dbInstance) {
+    return dbInstance;
+  }
+
+  // Get database path in user data directory (cross-platform)
+  const dbPath = app && app.isReady() 
+    ? path.join(app.getPath('userData'), 'notes.db')
+    : path.join(process.cwd(), 'notes.db');
+  
+  sqliteInstance = new Database(dbPath);
+  
+  // Create table if it doesn't exist
+  sqliteInstance.exec(`
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      content TEXT,
+      tags TEXT,
+      created_at INTEGER,
+      updated_at INTEGER,
+      embedding TEXT
+    )
+  `);
+  
+  dbInstance = drizzle(sqliteInstance, { schema: { notes } });
+  return dbInstance;
+}
+
+// CRUD functions
+async function getAllNotes() {
+  const db = getDatabase();
+  return db.select().from(notes).all();
+}
+
+async function getNote(id) {
+  const db = getDatabase();
+  const result = await db.select().from(notes).where(eq(notes.id, id)).limit(1);
+  return result[0] || undefined;
+}
+
+async function createNote(data) {
+  const db = getDatabase();
+  // Ensure embedding defaults to empty array JSON string if not provided
+  const embedding = data.embedding || JSON.stringify([]);
+  
+  // Drizzle maps createdAt to created_at automatically based on schema
+  return db.insert(notes).values({
+    id: data.id,
+    title: data.title,
+    content: data.content,
+    tags: data.tags,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+    embedding: embedding,
+  }).run();
+}
+
+async function updateNote(id, data) {
+  const db = getDatabase();
+  
+  // Stringify embedding if it's an array
+  const updateData = { ...data };
+  if (data.embedding !== undefined && data.embedding !== null) {
+    if (Array.isArray(data.embedding)) {
+      updateData.embedding = JSON.stringify(data.embedding);
+    } else {
+      updateData.embedding = data.embedding;
+    }
+  }
+  
+  return db.update(notes).set(updateData).where(eq(notes.id, id)).run();
+}
+
+async function deleteNote(id) {
+  const db = getDatabase();
+  return db.delete(notes).where(eq(notes.id, id)).run();
+}
+
+async function getNotesByTag(tag) {
+  const db = getDatabase();
+  const allNotes = await db.select().from(notes).all();
+  return allNotes.filter(note => {
+    if (!note.tags) return false;
+    const tags = JSON.parse(note.tags);
+    return Array.isArray(tags) && tags.includes(tag);
+  });
+}
+
+async function searchNotesByText(query) {
+  const db = getDatabase();
+  const allNotes = await db.select().from(notes).all();
+  const lowerQuery = query.toLowerCase();
+  return allNotes.filter(note => {
+    const title = (note.title || '').toLowerCase();
+    const content = (note.content || '').toLowerCase();
+    let tags = [];
+    if (note.tags) {
+      try {
+        tags = JSON.parse(note.tags);
+      } catch (e) {
+        tags = [];
+      }
+    }
+    const tagMatch = tags.some(tag => tag.toLowerCase().includes(lowerQuery));
+    return title.includes(lowerQuery) || content.includes(lowerQuery) || tagMatch;
+  });
+}
+
+async function getAllTags() {
+  const db = getDatabase();
+  const allNotes = await db.select().from(notes).all();
+  const tagSet = new Set();
+  allNotes.forEach(note => {
+    if (note.tags) {
+      try {
+        const tags = JSON.parse(note.tags);
+        if (Array.isArray(tags)) {
+          tags.forEach(tag => tagSet.add(tag));
+        }
+      } catch (e) {
+        // Ignore invalid JSON
+      }
+    }
+  });
+  return Array.from(tagSet).sort();
+}
+
+module.exports = {
+  getAllNotes,
+  getNote,
+  createNote,
+  updateNote,
+  deleteNote,
+  getNotesByTag,
+  searchNotesByText,
+  getAllTags,
+};
+

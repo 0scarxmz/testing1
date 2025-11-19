@@ -1,5 +1,20 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+// Load environment variables from .env.local
+const dotenv = require('dotenv');
 const path = require('path');
+const envPath = path.join(__dirname, '../.env.local');
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error('Error loading .env.local:', result.error);
+} else {
+  console.log('Loaded environment variables from:', envPath);
+  console.log('OPENAI_API_KEY loaded:', !!process.env.OPENAI_API_KEY);
+  if (process.env.OPENAI_API_KEY) {
+    console.log('OPENAI_API_KEY length:', process.env.OPENAI_API_KEY.length);
+  }
+}
+
+const { app, BrowserWindow, ipcMain } = require('electron');
 const db = require('./db/index');
 const { generateEmbedding } = require('./ai/embeddings');
 const { cosineSimilarity } = require('./ai/vector');
