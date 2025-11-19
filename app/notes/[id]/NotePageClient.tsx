@@ -11,7 +11,6 @@ import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { extractTags } from '@/lib/tags';
 import { TagInput } from '@/components/tag-input';
-import { generateEmbedding, isEmbeddingAvailable } from '@/lib/embeddings';
 import { RelatedNotes } from '@/components/RelatedNotes';
 
 export function NotePageClient() {
@@ -67,12 +66,21 @@ export function NotePageClient() {
       const extractedTags = extractTags(content);
       const allTags = [...new Set([...tags, ...extractedTags])];
 
-      // Generate embedding from title + content (only if API key is available)
+      // Generate embedding from title + content (use desktopAPI if in Electron)
       let embedding: number[] | null = null;
       const noteText = `${title || 'Untitled'}\n\n${content}`;
-      if (noteText.trim().length > 0 && isEmbeddingAvailable()) {
+      if (noteText.trim().length > 0) {
         try {
-          embedding = await generateEmbedding(noteText);
+          // Check if we're in Electron and desktopAPI is available
+          if (typeof window !== 'undefined' && (window as any).desktopAPI?.generateEmbedding) {
+            embedding = await (window as any).desktopAPI.generateEmbedding(noteText);
+          } else {
+            // Fallback to browser-side embedding (requires API key in frontend)
+            const { generateEmbedding, isEmbeddingAvailable } = await import('@/lib/embeddings');
+            if (isEmbeddingAvailable()) {
+              embedding = await generateEmbedding(noteText);
+            }
+          }
         } catch (error) {
           console.error('Failed to generate embedding:', error);
           // Don't block save if embedding fails

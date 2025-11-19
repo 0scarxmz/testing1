@@ -48,12 +48,33 @@ export function QuickCaptureProvider({ children }: { children: ReactNode }) {
       const tags = extractTags(input);
       const title = input.split('\n')[0].slice(0, 100) || 'Untitled';
       const content = input;
+      const noteText = `${title}\n\n${content}`;
+
+      // Generate embedding (use desktopAPI if in Electron)
+      let embedding: number[] | null = null;
+      if (noteText.trim().length > 0) {
+        try {
+          // Check if we're in Electron and desktopAPI is available
+          if (typeof window !== 'undefined' && (window as any).desktopAPI?.generateEmbedding) {
+            embedding = await (window as any).desktopAPI.generateEmbedding(noteText);
+          } else {
+            // Fallback to browser-side embedding (requires API key in frontend)
+            const { generateEmbedding, isEmbeddingAvailable } = await import('@/lib/embeddings');
+            if (isEmbeddingAvailable()) {
+              embedding = await generateEmbedding(noteText);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to generate embedding:', error);
+          // Don't block note creation if embedding fails
+        }
+      }
 
       const note = await createNote({
         title,
         content,
         tags,
-        embedding: null, // Embedding will be generated later if needed
+        embedding,
       });
 
       setInput('');
