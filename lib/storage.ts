@@ -5,29 +5,84 @@ import { generateUUID } from './utils';
 
 // Check if we're in Electron environment
 function isElectron(): boolean {
-  return typeof window !== 'undefined' && typeof (window as any).desktopAPI !== 'undefined';
+  if (typeof window === 'undefined') return false;
+  // Check Electron flag first (set by preload via contextBridge)
+  if ((window as any).__IS_ELECTRON__ === true) {
+    return true;
+  }
+  // Fallback: check desktopAPI
+  return typeof (window as any).desktopAPI !== 'undefined';
 }
 
 // SQLite storage functions (only used in Electron)
 // In Electron, we MUST use SQLite - never fall back to IndexedDB
 async function useSqliteStorage() {
-  if (!isElectron()) {
-    return null; // Not in Electron, use IndexedDB
+  // Check if we're in a browser environment (not Electron)
+  if (typeof window === 'undefined') {
+    console.log('[storage] Server-side, cannot use SQLite');
+    return null; // Server-side, OK
   }
   
-  // Verify desktopAPI is actually available
-  if (!(window as any).desktopAPI) {
-    console.error('Electron detected but desktopAPI is not available. This should not happen.');
-    throw new Error('desktopAPI not available in Electron environment');
+  // Diagnostic: Log what's available
+  console.log('[storage] === DIAGNOSTIC ===');
+  console.log('[storage] window.__IS_ELECTRON__:', (window as any).__IS_ELECTRON__);
+  console.log('[storage] window.desktopAPI:', typeof (window as any).desktopAPI);
+  console.log('[storage] navigator.userAgent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
+  console.log('[storage] window keys containing "electron" or "desktop":', 
+    Object.keys(window).filter(k => k.toLowerCase().includes('electron') || k.toLowerCase().includes('desktop')));
+  
+  const isElectronFlag = (window as any).__IS_ELECTRON__ === true;
+  const hasDesktopAPI = typeof (window as any).desktopAPI !== 'undefined';
+  const userAgentHasElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+  
+  // If we're in Electron (detected by flag OR userAgent) but desktopAPI is missing, FAIL LOUDLY
+  if ((isElectronFlag || userAgentHasElectron) && !hasDesktopAPI) {
+    console.error('[storage] ============================================');
+    console.error('[storage] CRITICAL ERROR: Electron detected but desktopAPI missing!');
+    console.error('[storage] Electron flag:', isElectronFlag);
+    console.error('[storage] UserAgent has Electron:', userAgentHasElectron);
+    console.error('[storage] desktopAPI available:', hasDesktopAPI);
+    console.error('[storage] ============================================');
+    throw new Error(
+      'CRITICAL: Running in Electron but desktopAPI is not available.\n' +
+      'This means the preload script failed to load or contextBridge failed.\n' +
+      'Check:\n' +
+      '1. Terminal output for [preload] messages\n' +
+      '2. Terminal output for [main] Preload script path\n' +
+      '3. electron/preload.js for syntax errors\n' +
+      '4. electron/main.js preload path is correct'
+    );
   }
+  
+  // If neither flag nor desktopAPI exists, check if we're actually in browser
+  if (!isElectronFlag && !hasDesktopAPI && !userAgentHasElectron) {
+    console.log('[storage] Browser environment detected, using IndexedDB');
+    return null; // Browser, use IndexedDB
+  }
+  
+  // Both exist, proceed with SQLite
+  console.log('[storage] ✓ Electron detected, using SQLite storage');
+  console.log('[storage] Electron flag:', isElectronFlag);
+  console.log('[storage] desktopAPI available:', hasDesktopAPI);
+  
+  // Verify desktopAPI methods are available
+  const desktopAPI = (window as any).desktopAPI;
+  console.log('[storage] desktopAPI methods:', {
+    hasGenerateEmbedding: typeof desktopAPI.generateEmbedding === 'function',
+    hasSemanticSearch: typeof desktopAPI.semanticSearch === 'function',
+    hasGetNotes: typeof desktopAPI.getNotes === 'function',
+    allMethods: Object.keys(desktopAPI),
+  });
   
   try {
+    console.log('[storage] Importing storage-sqlite...');
     const sqliteStorage = await import('./storage-sqlite');
+    console.log('[storage] SQLite storage imported successfully');
     return sqliteStorage;
   } catch (e) {
-    console.error('Failed to load SQLite storage:', e);
+    console.error('[storage] Failed to load SQLite storage:', e);
     // In Electron, we should never fall back to IndexedDB
-    throw new Error('SQLite storage is required in Electron but failed to load');
+    throw new Error('SQLite storage is required in Electron but failed to load: ' + (e instanceof Error ? e.message : String(e)));
   }
 }
 
@@ -207,11 +262,31 @@ export async function getAllTags(): Promise<string[]> {
  * @returns Array of notes with similarity scores, sorted by relevance
  */
 export async function searchNotesSemantic(query: string): Promise<NoteSearchResult[]> {
+  console.log('[storage] searchNotesSemantic called, query:', query);
+  
+  // Try to use SQLite storage (Electron)
   const sqliteStorage = await useSqliteStorage();
   if (sqliteStorage) {
+    console.log('[storage] Using SQLite storage for semantic search');
     return sqliteStorage.searchNotesSemantic(query);
   }
 
+  // If useSqliteStorage returned null, check if we're in Electron
+  // If we are, this is an error (should have thrown above)
+  const isElectron = typeof window !== 'undefined' && 
+    ((window as any).__IS_ELECTRON__ === true || 
+     (typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')));
+  
+  if (isElectron) {
+    // This should never happen if useSqliteStorage is working correctly
+    console.error('[storage] ERROR: In Electron but sqliteStorage is null!');
+    console.error('[storage] This indicates a bug in useSqliteStorage() - it should have thrown an error');
+    throw new Error('Semantic search failed: In Electron but SQLite storage unavailable. This is a bug.');
+  }
+
+  // Only use browser fallback if we're actually in a browser
+  console.log('[storage] Using browser fallback for semantic search');
+  
   if (!query || query.trim().length === 0) {
     return [];
   }

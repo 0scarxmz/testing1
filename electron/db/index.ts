@@ -56,11 +56,44 @@ export async function createNote(data: {
   tags: string; // JSON string
   createdAt: number;
   updatedAt: number;
-  embedding: string | null; // JSON string or null
+  embedding: string | null | number[]; // JSON string, null, or array (will be stringified)
 }) {
   const db = getDatabase();
-  // Ensure embedding defaults to empty array JSON string if not provided
-  const embedding = data.embedding || JSON.stringify([]);
+  
+  // Handle embedding: stringify arrays, keep strings as-is, default to null (not empty array)
+  let embedding: string | null;
+  if (data.embedding === null || data.embedding === undefined) {
+    embedding = null; // Store null, not empty array string
+  } else if (Array.isArray(data.embedding)) {
+    // Validate array before stringifying
+    if (data.embedding.length === 0) {
+      console.warn('Warning: Empty embedding array provided for note', data.id);
+      embedding = null;
+    } else if (!data.embedding.every(n => typeof n === 'number')) {
+      console.error('Error: Invalid embedding array - contains non-numbers for note', data.id);
+      embedding = null;
+    } else {
+      embedding = JSON.stringify(data.embedding);
+      console.log('Stringified embedding array, length:', data.embedding.length);
+    }
+  } else if (typeof data.embedding === 'string') {
+    // Already a string, validate it's valid JSON
+    try {
+      const parsed = JSON.parse(data.embedding);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        console.warn('Warning: Embedding string contains empty or invalid array for note', data.id);
+        embedding = null;
+      } else {
+        embedding = data.embedding; // Keep as-is
+      }
+    } catch (e) {
+      console.error('Error: Invalid embedding JSON string for note', data.id, e);
+      embedding = null;
+    }
+  } else {
+    console.error('Error: Invalid embedding type for note', data.id, typeof data.embedding);
+    embedding = null;
+  }
   
   // Drizzle maps createdAt to created_at automatically based on schema
   return db.insert(notes).values({
@@ -83,13 +116,40 @@ export async function updateNote(id: string, data: {
 }) {
   const db = getDatabase();
   
-  // Stringify embedding if it's an array
+  // Handle embedding: stringify arrays, validate strings, handle null
   const updateData: any = { ...data };
-  if (data.embedding !== undefined && data.embedding !== null) {
-    if (Array.isArray(data.embedding)) {
-      updateData.embedding = JSON.stringify(data.embedding);
+  if (data.embedding !== undefined) {
+    if (data.embedding === null) {
+      updateData.embedding = null;
+    } else if (Array.isArray(data.embedding)) {
+      // Validate array before stringifying
+      if (data.embedding.length === 0) {
+        console.warn('Warning: Empty embedding array provided for update, note', id);
+        updateData.embedding = null;
+      } else if (!data.embedding.every(n => typeof n === 'number')) {
+        console.error('Error: Invalid embedding array - contains non-numbers for note', id);
+        updateData.embedding = null;
+      } else {
+        updateData.embedding = JSON.stringify(data.embedding);
+        console.log('Stringified embedding array for update, length:', data.embedding.length);
+      }
+    } else if (typeof data.embedding === 'string') {
+      // Validate it's valid JSON
+      try {
+        const parsed = JSON.parse(data.embedding);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          console.warn('Warning: Embedding string contains empty or invalid array for note', id);
+          updateData.embedding = null;
+        } else {
+          updateData.embedding = data.embedding; // Keep as-is
+        }
+      } catch (e) {
+        console.error('Error: Invalid embedding JSON string for note', id, e);
+        updateData.embedding = null;
+      }
     } else {
-      updateData.embedding = data.embedding;
+      console.error('Error: Invalid embedding type for note', id, typeof data.embedding);
+      updateData.embedding = null;
     }
   }
   

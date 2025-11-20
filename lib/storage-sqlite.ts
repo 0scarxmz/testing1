@@ -48,6 +48,26 @@ function noteToSqlite(note: Partial<Note>): any {
   // Ensure tags are always an array before stringifying
   const tagsArray = Array.isArray(note.tags) ? note.tags : [];
   
+  // Handle embedding: validate and stringify if it's a valid array
+  let embedding: string | null = null;
+  if (note.embedding !== null && note.embedding !== undefined) {
+    if (Array.isArray(note.embedding)) {
+      // Validate embedding array
+      if (note.embedding.length === 0) {
+        console.warn('Warning: Empty embedding array in noteToSqlite for note', note.id);
+        embedding = null;
+      } else if (!note.embedding.every(n => typeof n === 'number')) {
+        console.error('Error: Invalid embedding array - contains non-numbers in noteToSqlite for note', note.id);
+        embedding = null;
+      } else {
+        embedding = JSON.stringify(note.embedding);
+      }
+    } else {
+      console.error('Error: Embedding is not an array in noteToSqlite for note', note.id, typeof note.embedding);
+      embedding = null;
+    }
+  }
+  
   return {
     id: note.id,
     title: note.title || '',
@@ -55,7 +75,7 @@ function noteToSqlite(note: Partial<Note>): any {
     tags: JSON.stringify(tagsArray),
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
-    embedding: note.embedding && Array.isArray(note.embedding) ? JSON.stringify(note.embedding) : null,
+    embedding: embedding,
   };
 }
 
@@ -84,6 +104,33 @@ export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedA
     createdAt: now,
     updatedAt: now,
   });
+
+  // Log embedding info (only if embedding exists and is valid)
+  if (sqliteNote.embedding) {
+    try {
+      const parsed = JSON.parse(sqliteNote.embedding);
+      console.log('Creating note with embedding:', {
+        noteId: id,
+        hasEmbedding: true,
+        embeddingLength: parsed.length,
+        embeddingPreview: parsed.slice(0, 3),
+        isValid: Array.isArray(parsed) && parsed.length > 0
+      });
+    } catch (e) {
+      console.error('Error parsing embedding in createNote log:', e);
+      console.log('Creating note with embedding:', {
+        noteId: id,
+        hasEmbedding: false,
+        error: 'Invalid embedding JSON'
+      });
+    }
+  } else {
+    console.log('Creating note with embedding:', {
+      noteId: id,
+      hasEmbedding: false,
+      reason: 'No embedding provided or invalid'
+    });
+  }
 
   await desktopAPI.createNote(sqliteNote);
   
@@ -150,6 +197,12 @@ export async function updateNote(id: string, updates: Partial<Omit<Note, 'id' | 
   };
 
   const sqliteNote = noteToSqlite(updated);
+  console.log('Updating note with embedding:', {
+    noteId: id,
+    hasEmbedding: !!sqliteNote.embedding,
+    embeddingLength: sqliteNote.embedding ? JSON.parse(sqliteNote.embedding).length : 0
+  });
+  
   await desktopAPI.updateNote(id, {
     title: sqliteNote.title,
     content: sqliteNote.content,
@@ -228,6 +281,8 @@ export async function getNoteRelationships(noteId: string): Promise<Relationship
  * Semantic search using vector embeddings and cosine similarity
  */
 export async function searchNotesSemantic(query: string): Promise<NoteSearchResult[]> {
+  console.log('[storage-sqlite] searchNotesSemantic called');
+  
   if (!isElectron()) {
     throw new Error('SQLite storage only available in Electron');
   }
@@ -238,25 +293,61 @@ export async function searchNotesSemantic(query: string): Promise<NoteSearchResu
 
   const desktopAPI = window.desktopAPI;
   if (!desktopAPI) {
-    throw new Error('desktopAPI is not available');
+    console.error('[storage-sqlite] ERROR: desktopAPI is not available!');
+    console.error('[storage-sqlite] window.desktopAPI:', window.desktopAPI);
+    throw new Error('desktopAPI is not available. Make sure electron/preload.js is loading correctly.');
+  }
+  
+  console.log('[storage-sqlite] desktopAPI is available, checking methods...');
+  console.log('[storage-sqlite] generateEmbedding:', typeof desktopAPI.generateEmbedding);
+  console.log('[storage-sqlite] semanticSearch:', typeof desktopAPI.semanticSearch);
+  
+  if (typeof desktopAPI.generateEmbedding !== 'function') {
+    throw new Error('desktopAPI.generateEmbedding is not a function. Check electron/preload.js');
+  }
+  
+  if (typeof desktopAPI.semanticSearch !== 'function') {
+    throw new Error('desktopAPI.semanticSearch is not a function. Check electron/preload.js');
   }
 
   try {
     // Generate embedding for query using desktopAPI
+    console.log('[Frontend] Generating embedding for query:', query);
     const queryEmbedding = await desktopAPI.generateEmbedding(query);
+    console.log('[Frontend] Query embedding generated, length:', queryEmbedding.length);
+    console.log('[Frontend] Query embedding preview:', queryEmbedding.slice(0, 3));
     
     // Perform semantic search using desktopAPI
+    console.log('[Frontend] Performing semantic search with embedding...');
     const rankedResults = await desktopAPI.semanticSearch(queryEmbedding);
+    console.log('[Frontend] Semantic search returned', rankedResults.length, 'results');
+    
+    if (rankedResults.length === 0) {
+      console.warn('[Frontend] ⚠️  No results returned from semantic search');
+      console.warn('[Frontend] This usually means no notes have embeddings yet.');
+      console.warn('[Frontend] Try creating or updating a note to generate embeddings.');
+      return [];
+    }
+    
+    if (rankedResults.length > 0) {
+      console.log('[Frontend] Top result:', rankedResults[0]?.title, 'score:', rankedResults[0]?.score?.toFixed(4));
+    }
     
     // Convert SQLite results to Note interface
-    const results: NoteSearchResult[] = rankedResults.map((result: any) => ({
-      note: sqliteToNote(result),
-      score: result.score,
-    }));
+    // rankedResults are in format: { id, title, content, tags (string), embedding (array), score, ... }
+    const results: NoteSearchResult[] = rankedResults.map((result: any) => {
+      return {
+        note: sqliteToNote(result),
+        score: result.score || 0,
+      };
+    });
 
+    console.log('[Frontend] Converted', results.length, 'results to NoteSearchResult format');
+    console.log('[Frontend] First result note:', results[0]?.note?.title, 'id:', results[0]?.note?.id);
     return results;
   } catch (error) {
-    console.error('Semantic search failed:', error);
+    console.error('[Frontend] Semantic search failed:', error);
+    console.error('[Frontend] Error details:', error instanceof Error ? error.message : String(error));
     // If embedding generation fails (e.g., no API key), return empty results
     return [];
   }

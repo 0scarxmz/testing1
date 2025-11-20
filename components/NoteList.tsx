@@ -106,24 +106,26 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
 
   // Combine filters: tag filter first, then search
   const displayNotes = useMemo(() => {
-    let filtered = filteredNotes;
-
-    // Apply tag filter if active
-    if (activeTag) {
-      filtered = filtered.filter(n => n.tags.includes(activeTag));
-    }
-
-    // Apply search filter within tag-filtered results
+    // If we have a search query, use search results directly (especially for semantic search)
     if (searchQuery.trim()) {
       if (searchResults.length > 0) {
-        const searchResultIds = new Set(searchResults.map(n => n.id));
-        filtered = filtered.filter(n => searchResultIds.has(n.id));
+        // Apply tag filter to search results if active
+        let filtered = searchResults;
+        if (activeTag) {
+          filtered = filtered.filter(n => n.tags.includes(activeTag));
+        }
+        return filtered;
       } else {
-        // No search results, so filter to empty array to show "No notes found"
-        filtered = [];
+        // No search results, show empty
+        return [];
       }
     }
 
+    // No search query - show all notes with tag filter
+    let filtered = filteredNotes;
+    if (activeTag) {
+      filtered = filtered.filter(n => n.tags.includes(activeTag));
+    }
     return filtered;
   }, [filteredNotes, activeTag, searchQuery, searchResults]);
 
