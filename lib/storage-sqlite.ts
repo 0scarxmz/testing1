@@ -1,5 +1,6 @@
 import type { Note, Relationship, NoteSearchResult } from '@/types/note';
 import { generateUUID } from './utils';
+import { cosineSimilarity } from './embeddings';
 
 // Type guard to check if desktopAPI is available
 function isElectron(): boolean {

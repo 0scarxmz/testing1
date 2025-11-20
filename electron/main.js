@@ -11,30 +11,55 @@ const possiblePaths = [
 ];
 
 let envLoaded = false;
+let loadedPath = null;
 for (const envPath of possiblePaths) {
   if (fs.existsSync(envPath)) {
-    const result = dotenv.config({ path: envPath });
-    if (!result.error) {
-      console.log('✓ Loaded environment variables from:', envPath);
+    console.log('[env] Attempting to load from:', envPath);
+    const result = dotenv.config({ path: envPath, override: true });
+    if (result.error) {
+      console.error('[env] Error loading:', result.error);
+    } else {
+      console.log('[env] ✓ Loaded environment variables from:', envPath);
+      console.log('[env] Parsed keys:', Object.keys(result.parsed || {}));
       envLoaded = true;
+      loadedPath = envPath;
       break;
     }
+  } else {
+    console.log('[env] File not found:', envPath);
   }
 }
 
 if (!envLoaded) {
-  console.error('✗ ERROR: .env.local not found in any location!');
-  console.error('Tried:', possiblePaths);
-  console.error('Current working directory:', process.cwd());
-  console.error('__dirname:', __dirname);
+  console.error('[env] ✗ ERROR: .env.local not found in any location!');
+  console.error('[env] Tried:', possiblePaths);
+  console.error('[env] Current working directory:', process.cwd());
+  console.error('[env] __dirname:', __dirname);
+} else {
+  console.log('[env] ✓ Environment file loaded successfully from:', loadedPath);
 }
 
-console.log('OPENAI_API_KEY loaded:', !!process.env.OPENAI_API_KEY);
+// Force set the API key if it exists in the file but wasn't parsed
+if (!process.env.OPENAI_API_KEY && loadedPath) {
+  try {
+    const envContent = fs.readFileSync(loadedPath, 'utf8');
+    const match = envContent.match(/^OPENAI_API_KEY=(.+)$/m);
+    if (match && match[1]) {
+      process.env.OPENAI_API_KEY = match[1].trim();
+      console.log('[env] ✓ Manually extracted OPENAI_API_KEY from file');
+    }
+  } catch (e) {
+    console.error('[env] Error reading .env.local:', e);
+  }
+}
+
+console.log('[env] OPENAI_API_KEY loaded:', !!process.env.OPENAI_API_KEY);
 if (process.env.OPENAI_API_KEY) {
-  console.log('OPENAI_API_KEY length:', process.env.OPENAI_API_KEY.length);
+  console.log('[env] OPENAI_API_KEY length:', process.env.OPENAI_API_KEY.length);
+  console.log('[env] OPENAI_API_KEY starts with:', process.env.OPENAI_API_KEY.substring(0, 10) + '...');
 } else {
-  console.error('✗ CRITICAL: OPENAI_API_KEY is not set!');
-  console.error('Create .env.local in project root with: OPENAI_API_KEY=your-key');
+  console.error('[env] ✗ CRITICAL: OPENAI_API_KEY is not set!');
+  console.error('[env] Create .env.local in project root with: OPENAI_API_KEY=your-key');
 }
 
 console.log('[main] ===== ELECTRON STARTING =====');
