@@ -178,29 +178,34 @@ export function NotePageClient() {
         </div>
       </header>
       
-      {/* Cover Image - Full width, between header and content */}
-      {note?.screenshotPath && (
-        <div className="relative w-full h-[300px] overflow-hidden bg-muted">
-          <img
-            src={normalizeFilePath(note.screenshotPath)}
-            alt="Screenshot cover"
-            className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-            onClick={() => setScreenshotModalOpen(true)}
-            onError={(e) => {
-              console.error('Failed to load screenshot:', note.screenshotPath);
-              (e.target as HTMLImageElement).style.display = 'none';
+      <main className="container mx-auto p-4 max-w-4xl relative min-h-[calc(100vh-80px)]">
+        {/* Background screenshot - clickable to view full size */}
+        {note?.screenshotPath && (
+          <div 
+            className="absolute inset-0 -z-10 opacity-20 blur-sm rounded-lg cursor-pointer hover:opacity-30 transition-opacity"
+            style={{
+              backgroundImage: `url(${normalizeFilePath(note.screenshotPath)})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
             }}
+            onClick={() => setScreenshotModalOpen(true)}
+            title="Click to view full screenshot"
           />
-        </div>
-      )}
-      
-      <main className="container mx-auto p-4 max-w-4xl">
-        <div className="space-y-4">
+        )}
+        
+        {/* Semi-transparent overlay for readability */}
+        {note?.screenshotPath && (
+          <div className="absolute inset-0 -z-10 bg-background/70 rounded-lg" />
+        )}
+        
+        {/* Content on top */}
+        <div className="relative z-10 space-y-4">
           <Input
             placeholder="Note title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="text-2xl font-bold border-0 focus-visible:ring-0 shadow-none"
+            className="text-2xl font-bold border-0 focus-visible:ring-0 shadow-none bg-transparent"
           />
           <div>
             <TagInput tags={tags} onChange={setTags} placeholder="Add tag..." />
