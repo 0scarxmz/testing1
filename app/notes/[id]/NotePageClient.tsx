@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getNote, updateNote, deleteNote } from '@/lib/storage';
 import type { Note } from '@/types/note';
@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { extractTags } from '@/lib/tags';
 import { TagInput } from '@/components/tag-input';
 import { RelatedNotes } from '@/components/RelatedNotes';
+import { ScreenshotModal } from '@/components/ScreenshotModal';
 
 export function NotePageClient() {
   const params = useParams();
@@ -25,20 +26,9 @@ export function NotePageClient() {
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (isNew) {
-      setNote(null);
-      setTitle('');
-      setContent('');
-      setTags([]);
-      setLoading(false);
-    } else {
-      loadNote();
-    }
-  }, [id, isNew]);
-
-  async function loadNote() {
+  const loadNote = useCallback(async () => {
     try {
       const loadedNote = await getNote(id);
       if (loadedNote) {
@@ -55,7 +45,26 @@ export function NotePageClient() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id, router]);
+
+  useEffect(() => {
+    if (isNew) {
+      setNote(null);
+      setTitle('');
+      setContent('');
+      setTags([]);
+      setLoading(false);
+    } else {
+      loadNote();
+      
+      // Poll for updates every 3 seconds to catch screenshot and AI-generated content
+      const interval = setInterval(() => {
+        loadNote();
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [id, isNew, loadNote]);
 
   async function handleSave() {
     if (saving) return;
@@ -131,6 +140,19 @@ export function NotePageClient() {
     return <div className="container mx-auto p-4">Loading...</div>;
   }
 
+  // Helper function to normalize file path for file:// URL (Windows compatibility)
+  function normalizeFilePath(filePath: string): string {
+    if (!filePath) return '';
+    // Normalize file path for file:// URL
+    // Windows paths need forward slashes and three slashes after file:
+    let normalizedPath = filePath.replace(/\\/g, '/');
+    // Ensure it starts with file:// (three slashes for absolute paths)
+    if (!normalizedPath.startsWith('file://')) {
+      normalizedPath = `file:///${normalizedPath}`;
+    }
+    return normalizedPath;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -155,6 +177,23 @@ export function NotePageClient() {
           </div>
         </div>
       </header>
+      
+      {/* Cover Image - Full width, between header and content */}
+      {note?.screenshotPath && (
+        <div className="relative w-full h-[300px] overflow-hidden bg-muted">
+          <img
+            src={normalizeFilePath(note.screenshotPath)}
+            alt="Screenshot cover"
+            className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+            onClick={() => setScreenshotModalOpen(true)}
+            onError={(e) => {
+              console.error('Failed to load screenshot:', note.screenshotPath);
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+      
       <main className="container mx-auto p-4 max-w-4xl">
         <div className="space-y-4">
           <Input
@@ -172,6 +211,13 @@ export function NotePageClient() {
           )}
         </div>
       </main>
+      {note?.screenshotPath && (
+        <ScreenshotModal
+          open={screenshotModalOpen}
+          onOpenChange={setScreenshotModalOpen}
+          screenshotPath={note.screenshotPath}
+        />
+      )}
     </div>
   );
 }

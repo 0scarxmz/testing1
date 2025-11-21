@@ -41,6 +41,9 @@ try {
       createQuickNote: (content) => ipcRenderer.invoke('quick-capture:createNote', content),
       closeQuickCapture: () => ipcRenderer.invoke('quick-capture:close'),
       
+      // Screenshot operations
+      captureScreenshot: (noteId) => ipcRenderer.invoke('screenshot:capture', noteId),
+      
       // Placeholder for future APIs
       // File operations: will be added later
     });
@@ -60,7 +63,8 @@ try {
       'generateNoteTitle',
       'generateNoteTags',
       'createQuickNote',
-      'closeQuickCapture'
+      'closeQuickCapture',
+      'captureScreenshot'
     ]);
   } catch (error) {
     console.error('[preload] ERROR: Failed to expose APIs:', error);

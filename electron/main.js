@@ -84,10 +84,14 @@ const { generateEmbedding } = require('./ai/embeddings');
 const { cosineSimilarity } = require('./ai/vector');
 const { generateNoteTitle } = require('./ai/title-generator');
 const { generateNoteTags } = require('./ai/tag-generator');
+const { captureScreenshot } = require('./screenshot');
 
 // Store references to windows
 let mainWindow = null;
 let quickCaptureWindow = null;
+
+// Store pending screenshot for quick capture (captured when window opens)
+let pendingQuickCaptureScreenshot = null;
 
 function createWindow() {
   // Verify preload path - try multiple possible locations
@@ -312,6 +316,19 @@ function createQuickCaptureWindow() {
   });
 
   win.on('closed', () => {
+    // Clear pending screenshot if window is closed without creating note
+    if (pendingQuickCaptureScreenshot) {
+      const fs = require('fs');
+      try {
+        if (fs.existsSync(pendingQuickCaptureScreenshot.path)) {
+          fs.unlinkSync(pendingQuickCaptureScreenshot.path);
+          console.log('[main] Cleaned up pending screenshot:', pendingQuickCaptureScreenshot.path);
+        }
+      } catch (err) {
+        console.error('[main] Failed to clean up pending screenshot:', err);
+      }
+      pendingQuickCaptureScreenshot = null;
+    }
     quickCaptureWindow = null;
   });
 
@@ -319,13 +336,38 @@ function createQuickCaptureWindow() {
   return win;
 }
 
-function toggleQuickCaptureWindow() {
+async function toggleQuickCaptureWindow() {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed() && quickCaptureWindow.isVisible()) {
     quickCaptureWindow.hide();
+    // Clear pending screenshot if window is closed without creating note
+    pendingQuickCaptureScreenshot = null;
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.focus();
     }
   } else {
+    // Capture screenshot BEFORE opening window
+    console.log('[main] Capturing screenshot before opening quick capture window...');
+    const { randomUUID } = require('crypto');
+    const tempId = randomUUID();
+    
+    // Capture screenshot in background (don't block window opening)
+    captureScreenshot(tempId).then(screenshotPath => {
+      if (screenshotPath) {
+        console.log('[main] Screenshot captured for quick capture:', screenshotPath);
+        pendingQuickCaptureScreenshot = {
+          tempId: tempId,
+          path: screenshotPath
+        };
+      } else {
+        console.warn('[main] Screenshot capture failed, continuing without screenshot');
+        pendingQuickCaptureScreenshot = null;
+      }
+    }).catch(err => {
+      console.error('[main] Screenshot capture error:', err);
+      pendingQuickCaptureScreenshot = null;
+    });
+    
+    // Open window immediately (don't wait for screenshot)
     if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
       quickCaptureWindow.show();
       quickCaptureWindow.focus();
@@ -336,9 +378,37 @@ function toggleQuickCaptureWindow() {
 }
 
 // Async processing function for quick capture notes
-async function processQuickNoteAsync(noteId, content) {
+async function processQuickNoteAsync(noteId, content, existingScreenshotPath = null) {
   try {
     console.log('[main] Starting async processing for quick note', noteId);
+    
+    // Only capture screenshot if we don't already have one (from quick capture window opening)
+    if (!existingScreenshotPath) {
+      // This is for regular notes, not quick capture
+      captureScreenshot(noteId).then(screenshotPath => {
+        if (screenshotPath) {
+          console.log('[main] Screenshot captured for note', noteId);
+          db.updateNote(noteId, {
+            screenshotPath: screenshotPath,
+            updatedAt: Date.now(),
+          }).then(() => {
+            console.log('[main] Note updated with screenshot path:', screenshotPath);
+            // Notify main window to refresh
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('note:updated', { id: noteId });
+            }
+          }).catch(err => {
+            console.error('[main] Failed to update note with screenshot path:', err);
+          });
+        } else {
+          console.warn('[main] Screenshot capture failed for note', noteId);
+        }
+      }).catch(err => {
+        console.error('[main] Screenshot capture error:', err);
+      });
+    } else {
+      console.log('[main] Note already has screenshot from quick capture, skipping capture');
+    }
     
     // Generate title, tags, and embedding in parallel
     const [title, tags, embedding] = await Promise.all([
@@ -373,9 +443,9 @@ async function processQuickNoteAsync(noteId, content) {
 
     console.log('[main] Successfully updated quick note', noteId, 'with AI-generated content');
 
-    // Notify main window to refresh (optional, polling already handles this)
+    // Notify main window to refresh
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('note:created');
+      mainWindow.webContents.send('note:updated', { id: noteId });
     }
   } catch (error) {
     console.error('[main] Error in async processing for quick note', noteId, ':', error);
@@ -515,7 +585,35 @@ ipcMain.handle('quick-capture:createNote', async (_, content) => {
     const id = randomUUID();
     const now = Date.now();
 
-    // Create note with defaults (title="untitled", tags=[], embedding=null)
+    // Handle pending screenshot (captured when window opened)
+    let screenshotPath = null;
+    if (pendingQuickCaptureScreenshot) {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Rename screenshot file from temp ID to real note ID
+      const oldPath = pendingQuickCaptureScreenshot.path;
+      const screenshotsDir = path.dirname(oldPath);
+      const newPath = path.join(screenshotsDir, `${id}.png`);
+      
+      try {
+        if (fs.existsSync(oldPath)) {
+          fs.renameSync(oldPath, newPath);
+          screenshotPath = newPath;
+          console.log('[main] Renamed screenshot from', pendingQuickCaptureScreenshot.tempId, 'to', id);
+        } else {
+          console.warn('[main] Pending screenshot file not found:', oldPath);
+        }
+      } catch (err) {
+        console.error('[main] Failed to rename screenshot:', err);
+        // Continue without screenshot
+      }
+      
+      // Clear pending screenshot
+      pendingQuickCaptureScreenshot = null;
+    }
+
+    // Create note with defaults (title="untitled", tags=[], embedding=null, screenshot if available)
     await db.createNote({
       id,
       title: 'untitled',
@@ -524,19 +622,20 @@ ipcMain.handle('quick-capture:createNote', async (_, content) => {
       createdAt: now,
       updatedAt: now,
       embedding: null,
+      screenshotPath: screenshotPath,
       autoGeneratedTitle: 0,
       autoGeneratedTags: 0,
     });
 
-    console.log('[main] Quick capture: note created with ID', id);
+    console.log('[main] Quick capture: note created with ID', id, 'screenshot:', screenshotPath ? 'yes' : 'no');
 
     // Close quick capture window immediately
     if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
       quickCaptureWindow.hide();
     }
 
-    // Trigger async AI processing in background
-    processQuickNoteAsync(id, content).catch(err => {
+    // Trigger async AI processing in background (screenshot already attached, so don't capture again)
+    processQuickNoteAsync(id, content, screenshotPath).catch(err => {
       console.error('[main] Failed to start async processing for quick note:', err);
     });
 
@@ -550,6 +649,18 @@ ipcMain.handle('quick-capture:createNote', async (_, content) => {
 ipcMain.handle('quick-capture:close', () => {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
     quickCaptureWindow.hide();
+  }
+});
+
+// Screenshot IPC handler
+ipcMain.handle('screenshot:capture', async (_, noteId) => {
+  try {
+    console.log('[main] Screenshot capture requested for note', noteId);
+    const screenshotPath = await captureScreenshot(noteId);
+    return screenshotPath;
+  } catch (error) {
+    console.error('[main] Screenshot capture failed:', error);
+    return null;
   }
 });
 

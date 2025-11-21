@@ -176,6 +176,19 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
     );
   }
 
+  // Helper function to normalize file path for file:// URL (Windows compatibility)
+  function normalizeFilePath(filePath: string): string {
+    if (!filePath) return '';
+    // Normalize file path for file:// URL
+    // Windows paths need forward slashes and three slashes after file:
+    let normalizedPath = filePath.replace(/\\/g, '/');
+    // Ensure it starts with file:// (three slashes for absolute paths)
+    if (!normalizedPath.startsWith('file://')) {
+      normalizedPath = `file:///${normalizedPath}`;
+    }
+    return normalizedPath;
+  }
+
   return (
     <div className="grid gap-4 p-2">
       {displayNotes.map((note) => (
@@ -188,6 +201,19 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {note.screenshotPath && (
+                <div className="mb-3">
+                  <img
+                    src={normalizeFilePath(note.screenshotPath)}
+                    alt="Screenshot"
+                    className="w-full h-32 object-cover rounded-md shadow-sm"
+                    onError={(e) => {
+                      console.error('Failed to load screenshot thumbnail:', note.screenshotPath);
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                 {getPlainText(note.content)}
               </p>
