@@ -1,3 +1,36 @@
+// === Patch console globally to avoid EPIPE crashes ===
+// This MUST be at the very top, before ANY console.log() calls
+const originalConsole = { 
+  log: console.log, 
+  error: console.error, 
+  warn: console.warn 
+};
+
+console.log = (...args) => {
+  try {
+    if (process.stdout.writable && !process.stdout.destroyed) {
+      originalConsole.log(...args);
+    }
+  } catch (_) {}
+};
+
+console.error = (...args) => {
+  try {
+    if (process.stderr.writable && !process.stderr.destroyed) {
+      originalConsole.error(...args);
+    }
+  } catch (_) {}
+};
+
+console.warn = (...args) => {
+  try {
+    if (process.stdout.writable && !process.stdout.destroyed) {
+      originalConsole.warn(...args);
+    }
+  } catch (_) {}
+};
+// =====================================================
+
 // Load environment variables from .env.local
 const dotenv = require('dotenv');
 const path = require('path');
@@ -74,6 +107,7 @@ try {
 const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require('electron');
 
 // Safe logging utility to prevent EPIPE errors
+// Note: console.log/error/warn are already patched at the top of the file
 function safeLog(...args) {
   try {
     if (process.stdout.writable && !process.stdout.destroyed) {
@@ -93,42 +127,6 @@ function safeError(...args) {
     // Silently ignore EPIPE and other write errors
   }
 }
-
-// Override console methods globally to prevent EPIPE errors
-// This makes ALL existing console.log/error/warn calls safe automatically
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
-
-console.log = function(...args) {
-  try {
-    if (process.stdout.writable && !process.stdout.destroyed) {
-      originalConsoleLog.apply(console, args);
-    }
-  } catch (e) {
-    // Silently ignore EPIPE errors
-  }
-};
-
-console.error = function(...args) {
-  try {
-    if (process.stderr.writable && !process.stderr.destroyed) {
-      originalConsoleError.apply(console, args);
-    }
-  } catch (e) {
-    // Silently ignore EPIPE errors
-  }
-};
-
-console.warn = function(...args) {
-  try {
-    if (process.stdout.writable && !process.stdout.destroyed) {
-      originalConsoleWarn.apply(console, args);
-    }
-  } catch (e) {
-    // Silently ignore EPIPE errors
-  }
-};
 
 try {
   console.log('[main] App path:', app.getAppPath());
@@ -347,7 +345,7 @@ function createQuickCaptureWindow() {
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
-    show: false,
+    show: false,  // keep hidden until ready
     backgroundColor: '#ffffff',
     webPreferences: {
       preload: preloadPath,
@@ -357,7 +355,7 @@ function createQuickCaptureWindow() {
     },
   });
 
-  win.hide();
+  quickCaptureWindow = win;
 
   const isDev = !app.isPackaged;
   const devUrl = "http://localhost:3000/quick-capture";
@@ -365,12 +363,19 @@ function createQuickCaptureWindow() {
 
   win.loadURL(isDev ? devUrl : prodUrl);
 
-  win.on('closed', () => {
+  // Show ONLY after ready - prevents double-window and Mac timing issues
+  win.once("ready-to-show", () => {
+    if (!win.isDestroyed()) {
+      win.show();
+      win.focus();
+    }
+  });
+
+  win.on("closed", () => {
     quickCaptureWindow = null;
     pendingQuickNoteId = null;
   });
 
-  quickCaptureWindow = win;
   return win;
 }
 
@@ -417,21 +422,8 @@ async function openQuickCapture() {
     // Step 3: Store note ID and open window
     pendingQuickNoteId = noteId;
     
-    // Open the window
-    const win = createQuickCaptureWindow();
-    if (win.webContents.isLoading()) {
-      win.once('ready-to-show', () => {
-        if (!win.isDestroyed()) {
-          win.show();
-          win.focus();
-        }
-      });
-    } else {
-      if (!win.isDestroyed()) {
-        win.show();
-        win.focus();
-      }
-    }
+    // Open the window - createQuickCaptureWindow handles showing via ready-to-show event
+    createQuickCaptureWindow();
   } catch (err) {
     safeError('[main] Quick capture error:', err);
   }
