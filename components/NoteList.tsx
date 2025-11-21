@@ -46,6 +46,13 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
 
   useEffect(() => {
     loadNotes();
+    
+    // Poll for updates every 5 seconds to catch async AI-generated titles/tags
+    const interval = setInterval(() => {
+      loadNotes();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   async function loadNotes() {

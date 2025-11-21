@@ -33,6 +33,14 @@ try {
       generateEmbedding: (text) => ipcRenderer.invoke('embeddings:generate', text),
       semanticSearch: (queryEmbedding) => ipcRenderer.invoke('embeddings:semanticSearch', queryEmbedding),
       
+      // AI operations
+      generateNoteTitle: (content) => ipcRenderer.invoke('ai:generateTitle', content),
+      generateNoteTags: (content) => ipcRenderer.invoke('ai:generateTags', content),
+      
+      // Quick Capture operations
+      createQuickNote: (content) => ipcRenderer.invoke('quick-capture:createNote', content),
+      closeQuickCapture: () => ipcRenderer.invoke('quick-capture:close'),
+      
       // Placeholder for future APIs
       // File operations: will be added later
     });
@@ -48,7 +56,11 @@ try {
       'searchNotesByText',
       'getAllTags',
       'generateEmbedding',
-      'semanticSearch'
+      'semanticSearch',
+      'generateNoteTitle',
+      'generateNoteTags',
+      'createQuickNote',
+      'closeQuickCapture'
     ]);
   } catch (error) {
     console.error('[preload] ERROR: Failed to expose APIs:', error);
