@@ -37,12 +37,12 @@ try {
       generateNoteTitle: (content) => ipcRenderer.invoke('ai:generateTitle', content),
       generateNoteTags: (content) => ipcRenderer.invoke('ai:generateTags', content),
       
-      // Quick Capture operations
-      createQuickNote: (content) => ipcRenderer.invoke('quick-capture:createNote', content),
-      closeQuickCapture: () => ipcRenderer.invoke('quick-capture:close'),
-      
       // Screenshot operations
       captureScreenshot: (noteId) => ipcRenderer.invoke('screenshot:capture', noteId),
+      
+      // Quick Capture operations
+      updateQuickNote: (content) => ipcRenderer.invoke('quick-capture:updateNote', content),
+      closeQuickCapture: () => ipcRenderer.invoke('quick-capture:close'),
       
       // Placeholder for future APIs
       // File operations: will be added later
@@ -62,9 +62,9 @@ try {
       'semanticSearch',
       'generateNoteTitle',
       'generateNoteTags',
-      'createQuickNote',
-      'closeQuickCapture',
-      'captureScreenshot'
+      'captureScreenshot',
+      'updateQuickNote',
+      'closeQuickCapture'
     ]);
   } catch (error) {
     console.error('[preload] ERROR: Failed to expose APIs:', error);

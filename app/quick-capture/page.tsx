@@ -19,15 +19,15 @@ export default function QuickCapturePage() {
 
     setIsSubmitting(true);
     try {
-      // Check if we're in Electron and desktopAPI is available
-      if (typeof window !== 'undefined' && (window as any).desktopAPI?.createQuickNote) {
-        await (window as any).desktopAPI.createQuickNote(input.trim());
+      // Update the note with the content
+      if (typeof window !== 'undefined' && (window as any).desktopAPI?.updateQuickNote) {
+        await (window as any).desktopAPI.updateQuickNote(input.trim());
         setInput('');
       } else {
-        console.error('desktopAPI.createQuickNote is not available');
+        console.error('desktopAPI.updateQuickNote is not available');
       }
     } catch (error) {
-      console.error('Failed to create quick note:', error);
+      console.error('Failed to update quick note:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -48,20 +48,20 @@ export default function QuickCapturePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-[500px] rounded-3xl border border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-xl shadow-2xl p-6 animate-in fade-in duration-200">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-white">
+      <div className="w-full max-w-[500px] rounded-lg border border-gray-200 bg-white shadow-lg p-6">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="quick note…"
-          className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground text-lg leading-relaxed focus:ring-0 focus:outline-none"
+          placeholder="Type your note..."
+          className="w-full bg-white border-none outline-none resize-none text-gray-900 placeholder:text-gray-400 text-base leading-relaxed focus:ring-0 focus:outline-none"
           style={{ minHeight: '120px' }}
           disabled={isSubmitting}
         />
-        <div className="mt-4 text-xs text-muted-foreground text-center">
-          Press {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to save • ESC to close
+        <div className="mt-4 text-xs text-gray-500 text-center">
+          Press ⌘+Enter to save • ESC to close
         </div>
       </div>
     </div>

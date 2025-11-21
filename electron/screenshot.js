@@ -3,6 +3,27 @@ const fs = require('fs');
 const path = require('path');
 const { app, screen } = require('electron');
 
+// Safe logging utility to prevent EPIPE errors
+function safeLog(...args) {
+  try {
+    if (process.stdout.writable && !process.stdout.destroyed) {
+      console.log(...args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE and other write errors
+  }
+}
+
+function safeError(...args) {
+  try {
+    if (process.stderr.writable && !process.stderr.destroyed) {
+      console.error(...args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE and other write errors
+  }
+}
+
 /**
  * Capture screenshot of the entire screen
  * @param {string} noteId - Note ID to use as filename
@@ -78,8 +99,8 @@ async function captureScreenshot(noteId) {
     // Return absolute path
     return filePath;
   } catch (error) {
-    console.error('[screenshot] ✗ Failed to capture screenshot:', error);
-    console.error('[screenshot] Error stack:', error.stack);
+    safeError('[screenshot] ✗ Failed to capture screenshot:', error);
+    safeError('[screenshot] Error stack:', error.stack);
     return null;
   }
 }

@@ -73,6 +73,63 @@ try {
 
 const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require('electron');
 
+// Safe logging utility to prevent EPIPE errors
+function safeLog(...args) {
+  try {
+    if (process.stdout.writable && !process.stdout.destroyed) {
+      console.log(...args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE and other write errors
+  }
+}
+
+function safeError(...args) {
+  try {
+    if (process.stderr.writable && !process.stderr.destroyed) {
+      console.error(...args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE and other write errors
+  }
+}
+
+// Override console methods globally to prevent EPIPE errors
+// This makes ALL existing console.log/error/warn calls safe automatically
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+console.log = function(...args) {
+  try {
+    if (process.stdout.writable && !process.stdout.destroyed) {
+      originalConsoleLog.apply(console, args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE errors
+  }
+};
+
+console.error = function(...args) {
+  try {
+    if (process.stderr.writable && !process.stderr.destroyed) {
+      originalConsoleError.apply(console, args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE errors
+  }
+};
+
+console.warn = function(...args) {
+  try {
+    if (process.stdout.writable && !process.stdout.destroyed) {
+      originalConsoleWarn.apply(console, args);
+    }
+  } catch (e) {
+    // Silently ignore EPIPE errors
+  }
+};
+
 try {
   console.log('[main] App path:', app.getAppPath());
   console.log('[main] User data path:', app.getPath('userData'));
@@ -89,9 +146,7 @@ const { captureScreenshot } = require('./screenshot');
 // Store references to windows
 let mainWindow = null;
 let quickCaptureWindow = null;
-
-// Store pending screenshot for quick capture (captured when window opens)
-let pendingQuickCaptureScreenshot = null;
+let pendingQuickNoteId = null; // Store note ID created with screenshot
 
 function createWindow() {
   // Verify preload path - try multiple possible locations
@@ -249,7 +304,7 @@ function createWindow() {
   return win;
 }
 
-// Quick Capture Window
+// Quick Capture Window - Simple white window for quick notes
 function createQuickCaptureWindow() {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
     quickCaptureWindow.show();
@@ -278,7 +333,7 @@ function createQuickCaptureWindow() {
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const windowWidth = 500;
-  const windowHeight = 240;
+  const windowHeight = 200;
   const x = Math.floor((width - windowWidth) / 2);
   const y = Math.floor((height - windowHeight) / 2);
 
@@ -288,13 +343,12 @@ function createQuickCaptureWindow() {
     x: x,
     y: y,
     frame: false,
-    transparent: true,
+    transparent: false,
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
     show: false,
-    backgroundColor: '#00000000',
-    vibrancy: 'popover', // macOS glass effect
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -303,171 +357,107 @@ function createQuickCaptureWindow() {
     },
   });
 
-  // Determine if we're in development or production
+  win.hide();
+
   const isDev = !app.isPackaged;
   const devUrl = "http://localhost:3000/quick-capture";
   const prodUrl = `file://${path.join(__dirname, "../out/quick-capture.html")}`;
 
   win.loadURL(isDev ? devUrl : prodUrl);
 
-  win.once('ready-to-show', () => {
-    win.show();
-    win.focus();
-  });
-
   win.on('closed', () => {
-    // Clear pending screenshot if window is closed without creating note
-    if (pendingQuickCaptureScreenshot) {
-      const fs = require('fs');
-      try {
-        if (fs.existsSync(pendingQuickCaptureScreenshot.path)) {
-          fs.unlinkSync(pendingQuickCaptureScreenshot.path);
-          console.log('[main] Cleaned up pending screenshot:', pendingQuickCaptureScreenshot.path);
-        }
-      } catch (err) {
-        console.error('[main] Failed to clean up pending screenshot:', err);
-      }
-      pendingQuickCaptureScreenshot = null;
-    }
     quickCaptureWindow = null;
+    pendingQuickNoteId = null;
   });
 
   quickCaptureWindow = win;
   return win;
 }
 
-async function toggleQuickCaptureWindow() {
-  if (quickCaptureWindow && !quickCaptureWindow.isDestroyed() && quickCaptureWindow.isVisible()) {
-    quickCaptureWindow.hide();
-    // Clear pending screenshot if window is closed without creating note
-    pendingQuickCaptureScreenshot = null;
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.focus();
-    }
-  } else {
-    // Capture screenshot BEFORE opening window
-    console.log('[main] Capturing screenshot before opening quick capture window...');
-    const { randomUUID } = require('crypto');
-    const tempId = randomUUID();
-    
-    // Capture screenshot in background (don't block window opening)
-    captureScreenshot(tempId).then(screenshotPath => {
-      if (screenshotPath) {
-        console.log('[main] Screenshot captured for quick capture:', screenshotPath);
-        pendingQuickCaptureScreenshot = {
-          tempId: tempId,
-          path: screenshotPath
-        };
-      } else {
-        console.warn('[main] Screenshot capture failed, continuing without screenshot');
-        pendingQuickCaptureScreenshot = null;
-      }
-    }).catch(err => {
-      console.error('[main] Screenshot capture error:', err);
-      pendingQuickCaptureScreenshot = null;
-    });
-    
-    // Open window immediately (don't wait for screenshot)
-    if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
-      quickCaptureWindow.show();
-      quickCaptureWindow.focus();
-    } else {
-      createQuickCaptureWindow();
-    }
+// Quick Capture: Capture screenshot, create note, then open window
+async function openQuickCapture() {
+  // Only work on Mac
+  if (process.platform !== 'darwin') {
+    safeLog('[main] Quick capture only available on Mac');
+    return;
   }
-}
 
-// Async processing function for quick capture notes
-async function processQuickNoteAsync(noteId, content, existingScreenshotPath = null) {
+  safeLog('[main] Quick capture triggered - capturing screenshot first...');
+  
   try {
-    console.log('[main] Starting async processing for quick note', noteId);
+    // Step 1: Generate note ID first
+    const { randomUUID } = require('crypto');
+    const noteId = randomUUID();
     
-    // Only capture screenshot if we don't already have one (from quick capture window opening)
-    if (!existingScreenshotPath) {
-      // This is for regular notes, not quick capture
-      captureScreenshot(noteId).then(screenshotPath => {
-        if (screenshotPath) {
-          console.log('[main] Screenshot captured for note', noteId);
-          db.updateNote(noteId, {
-            screenshotPath: screenshotPath,
-            updatedAt: Date.now(),
-          }).then(() => {
-            console.log('[main] Note updated with screenshot path:', screenshotPath);
-            // Notify main window to refresh
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('note:updated', { id: noteId });
-            }
-          }).catch(err => {
-            console.error('[main] Failed to update note with screenshot path:', err);
-          });
-        } else {
-          console.warn('[main] Screenshot capture failed for note', noteId);
+    // Step 2: Capture screenshot with note ID
+    const screenshotPath = await captureScreenshot(noteId);
+    
+    if (!screenshotPath) {
+      safeLog('[main] Screenshot capture failed, continuing without screenshot');
+    }
+
+    // Step 3: Create note with screenshot (empty content for now)
+    const now = Date.now();
+    
+    await db.createNote({
+      id: noteId,
+      title: 'untitled',
+      content: '', // Empty initially, will be updated when user submits
+      tags: JSON.stringify([]),
+      createdAt: now,
+      updatedAt: now,
+      embedding: null,
+      screenshotPath: screenshotPath || null,
+      autoGeneratedTitle: 0,
+      autoGeneratedTags: 0,
+    });
+
+    safeLog('[main] Quick note created with ID', noteId, 'screenshot:', screenshotPath ? 'yes' : 'no');
+    
+    // Step 3: Store note ID and open window
+    pendingQuickNoteId = noteId;
+    
+    // Open the window
+    const win = createQuickCaptureWindow();
+    if (win.webContents.isLoading()) {
+      win.once('ready-to-show', () => {
+        if (!win.isDestroyed()) {
+          win.show();
+          win.focus();
         }
-      }).catch(err => {
-        console.error('[main] Screenshot capture error:', err);
       });
     } else {
-      console.log('[main] Note already has screenshot from quick capture, skipping capture');
+      if (!win.isDestroyed()) {
+        win.show();
+        win.focus();
+      }
     }
-    
-    // Generate title, tags, and embedding in parallel
-    const [title, tags, embedding] = await Promise.all([
-      generateNoteTitle(content).catch(err => {
-        console.error('[main] Failed to generate title:', err);
-        return 'untitled';
-      }),
-      generateNoteTags(content).catch(err => {
-        console.error('[main] Failed to generate tags:', err);
-        return [];
-      }),
-      generateEmbedding(content).catch(err => {
-        console.error('[main] Failed to generate embedding:', err);
-        return null;
-      }),
-    ]);
-
-    console.log('[main] Generated:', { title, tags, hasEmbedding: !!embedding });
-
-    // Update note with generated fields
-    const tagsJson = JSON.stringify(tags);
-    const embeddingJson = embedding ? JSON.stringify(embedding) : null;
-
-    await db.updateNote(noteId, {
-      title,
-      tags: tagsJson,
-      embedding: embeddingJson,
-      autoGeneratedTitle: 1,
-      autoGeneratedTags: 1,
-      updatedAt: Date.now(),
-    });
-
-    console.log('[main] Successfully updated quick note', noteId, 'with AI-generated content');
-
-    // Notify main window to refresh
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('note:updated', { id: noteId });
-    }
-  } catch (error) {
-    console.error('[main] Error in async processing for quick note', noteId, ':', error);
+  } catch (err) {
+    safeError('[main] Quick capture error:', err);
   }
 }
+
+
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
-  console.log('[main] ===== APP READY =====');
-  console.log('[main] Creating window...');
+  safeLog('[main] ===== APP READY =====');
+  safeLog('[main] Creating window...');
   createWindow();
 
-  // Register global shortcut for quick capture
-  const ret = globalShortcut.register('CommandOrControl+Shift+Space', () => {
-    console.log('[main] Quick capture hotkey pressed');
-    toggleQuickCaptureWindow();
-  });
+  // Register global shortcut for quick capture (Mac only)
+  if (process.platform === 'darwin') {
+    const shortcut = 'Control+Shift+Space';
+    const ret = globalShortcut.register(shortcut, () => {
+      safeLog('[main] Quick capture hotkey pressed');
+      openQuickCapture();
+    });
 
-  if (!ret) {
-    console.error('[main] Failed to register quick capture hotkey');
-  } else {
-    console.log('[main] ✓ Quick capture hotkey registered: Ctrl+Shift+Space');
+    if (!ret) {
+      safeError('[main] Failed to register quick capture hotkey');
+    } else {
+      safeLog('[main] ✓ Quick capture hotkey registered: Control+Shift+Space');
+    }
   }
 
   // Unregister all shortcuts when app quits
@@ -500,15 +490,15 @@ ipcMain.handle('db:getNote', async (_, id) => {
 });
 
 ipcMain.handle('db:createNote', async (_, data) => {
-  console.log('[IPC] Received createNote request');
-  console.log('[IPC] Note data:', {
+  safeLog('[IPC] Received createNote request');
+  safeLog('[IPC] Note data:', {
     id: data.id,
     title: data.title,
     hasEmbedding: !!data.embedding,
     embeddingType: data.embedding ? (Array.isArray(data.embedding) ? 'array' : typeof data.embedding) : 'null'
   });
   const result = await db.createNote(data);
-  console.log('[IPC] Note created successfully');
+  safeLog('[IPC] Note created successfully');
   return result;
 });
 
@@ -535,12 +525,12 @@ ipcMain.handle('db:getAllTags', async () => {
 // Embedding operations
 ipcMain.handle('embeddings:generate', async (_, text) => {
   try {
-    console.log('[IPC] Received embedding generation request, text length:', text.length);
+    safeLog('[IPC] Received embedding generation request, text length:', text.length);
     const embedding = await generateEmbedding(text);
-    console.log('[IPC] Generated embedding, length:', embedding.length);
+    safeLog('[IPC] Generated embedding, length:', embedding.length);
     return embedding;
   } catch (error) {
-    console.error('[IPC] Failed to generate embedding:', error);
+    safeError('[IPC] Failed to generate embedding:', error);
     throw error;
   }
 });
@@ -548,12 +538,12 @@ ipcMain.handle('embeddings:generate', async (_, text) => {
 // AI title generation
 ipcMain.handle('ai:generateTitle', async (_, content) => {
   try {
-    console.log('[IPC] Received title generation request, content length:', content.length);
+    safeLog('[IPC] Received title generation request, content length:', content.length);
     const title = await generateNoteTitle(content);
-    console.log('[IPC] Generated title:', title);
+    safeLog('[IPC] Generated title:', title);
     return title;
   } catch (error) {
-    console.error('[IPC] Failed to generate title:', error);
+    safeError('[IPC] Failed to generate title:', error);
     throw error;
   }
 });
@@ -561,120 +551,139 @@ ipcMain.handle('ai:generateTitle', async (_, content) => {
 // AI tag generation
 ipcMain.handle('ai:generateTags', async (_, content) => {
   try {
-    console.log('[IPC] Received tag generation request, content length:', content.length);
+    safeLog('[IPC] Received tag generation request, content length:', content.length);
     const tags = await generateNoteTags(content);
-    console.log('[IPC] Generated tags:', tags);
+    safeLog('[IPC] Generated tags:', tags);
     return tags;
   } catch (error) {
-    console.error('[IPC] Failed to generate tags:', error);
+    safeError('[IPC] Failed to generate tags:', error);
     throw error;
   }
 });
 
-// Quick Capture IPC handlers
-ipcMain.handle('quick-capture:createNote', async (_, content) => {
+
+// Screenshot IPC handler
+ipcMain.handle('screenshot:capture', async (_, noteId) => {
   try {
-    console.log('[main] Quick capture: creating note, content length:', content.length);
-    
+    safeLog('[main] Screenshot capture requested for note', noteId);
+    const screenshotPath = await captureScreenshot(noteId);
+    return screenshotPath;
+  } catch (error) {
+    safeError('[main] Screenshot capture failed:', error);
+    return null;
+  }
+});
+
+// Quick Capture IPC handlers
+ipcMain.handle('quick-capture:updateNote', async (_, content) => {
+  try {
+    if (!pendingQuickNoteId) {
+      throw new Error('No pending quick note to update');
+    }
+
     if (!content || content.trim().length === 0) {
       throw new Error('Content cannot be empty');
     }
 
-    // Generate UUID for note ID
-    const { randomUUID } = require('crypto');
-    const id = randomUUID();
-    const now = Date.now();
+    safeLog('[main] Updating quick note', pendingQuickNoteId, 'with content length:', content.length);
 
-    // Handle pending screenshot (captured when window opened)
-    let screenshotPath = null;
-    if (pendingQuickCaptureScreenshot) {
-      const fs = require('fs');
-      const path = require('path');
-      
-      // Rename screenshot file from temp ID to real note ID
-      const oldPath = pendingQuickCaptureScreenshot.path;
-      const screenshotsDir = path.dirname(oldPath);
-      const newPath = path.join(screenshotsDir, `${id}.png`);
-      
-      try {
-        if (fs.existsSync(oldPath)) {
-          fs.renameSync(oldPath, newPath);
-          screenshotPath = newPath;
-          console.log('[main] Renamed screenshot from', pendingQuickCaptureScreenshot.tempId, 'to', id);
-        } else {
-          console.warn('[main] Pending screenshot file not found:', oldPath);
-        }
-      } catch (err) {
-        console.error('[main] Failed to rename screenshot:', err);
-        // Continue without screenshot
-      }
-      
-      // Clear pending screenshot
-      pendingQuickCaptureScreenshot = null;
-    }
-
-    // Create note with defaults (title="untitled", tags=[], embedding=null, screenshot if available)
-    await db.createNote({
-      id,
-      title: 'untitled',
+    // Update the note with content
+    await db.updateNote(pendingQuickNoteId, {
       content: content.trim(),
-      tags: JSON.stringify([]),
-      createdAt: now,
-      updatedAt: now,
-      embedding: null,
-      screenshotPath: screenshotPath,
-      autoGeneratedTitle: 0,
-      autoGeneratedTags: 0,
+      updatedAt: Date.now(),
     });
 
-    console.log('[main] Quick capture: note created with ID', id, 'screenshot:', screenshotPath ? 'yes' : 'no');
+    safeLog('[main] Quick note updated successfully');
 
-    // Close quick capture window immediately
+    // Save note ID before clearing
+    const noteId = pendingQuickNoteId;
+    pendingQuickNoteId = null;
+
+    // Close the window
     if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
+      quickCaptureWindow.setAlwaysOnTop(false);
       quickCaptureWindow.hide();
+      setTimeout(() => {
+        if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
+          quickCaptureWindow.destroy();
+          quickCaptureWindow = null;
+        }
+      }, 50);
     }
 
-    // Trigger async AI processing in background (screenshot already attached, so don't capture again)
-    processQuickNoteAsync(id, content, screenshotPath).catch(err => {
-      console.error('[main] Failed to start async processing for quick note:', err);
+    // Trigger async AI processing (title, tags, embedding)
+    const { generateNoteTitle } = require('./ai/title-generator');
+    const { generateNoteTags } = require('./ai/tag-generator');
+    const { generateEmbedding } = require('./ai/embeddings');
+
+    Promise.all([
+      generateNoteTitle(content).catch(err => {
+        safeError('[main] Failed to generate title:', err);
+        return 'untitled';
+      }),
+      generateNoteTags(content).catch(err => {
+        safeError('[main] Failed to generate tags:', err);
+        return [];
+      }),
+      generateEmbedding(content).catch(err => {
+        safeError('[main] Failed to generate embedding:', err);
+        return null;
+      }),
+    ]).then(([title, tags, embedding]) => {
+      const tagsJson = JSON.stringify(tags);
+      const embeddingJson = embedding ? JSON.stringify(embedding) : null;
+
+      db.updateNote(noteId, {
+        title,
+        tags: tagsJson,
+        embedding: embeddingJson,
+        autoGeneratedTitle: 1,
+        autoGeneratedTags: 1,
+        updatedAt: Date.now(),
+      }).then(() => {
+        safeLog('[main] Quick note updated with AI-generated content');
+        // Notify main window to refresh
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('note:updated', { id: noteId });
+        }
+      }).catch(err => {
+        safeError('[main] Failed to update note with AI content:', err);
+      });
     });
 
-    return { success: true, id };
+    return { success: true, id: noteId };
   } catch (error) {
-    console.error('[main] Quick capture: failed to create note:', error);
+    safeError('[main] Quick capture: failed to update note:', error);
     throw error;
   }
 });
 
 ipcMain.handle('quick-capture:close', () => {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
+    quickCaptureWindow.setAlwaysOnTop(false);
     quickCaptureWindow.hide();
+    setTimeout(() => {
+      if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
+        quickCaptureWindow.destroy();
+        quickCaptureWindow = null;
+      }
+    }, 50);
   }
-});
-
-// Screenshot IPC handler
-ipcMain.handle('screenshot:capture', async (_, noteId) => {
-  try {
-    console.log('[main] Screenshot capture requested for note', noteId);
-    const screenshotPath = await captureScreenshot(noteId);
-    return screenshotPath;
-  } catch (error) {
-    console.error('[main] Screenshot capture failed:', error);
-    return null;
-  }
+  // Clear pending note ID if window is closed without saving
+  pendingQuickNoteId = null;
 });
 
 // Semantic search
 ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
   try {
-    console.log('[IPC] Received semantic search request');
-    console.log('[IPC] Query embedding type:', Array.isArray(queryEmbedding) ? 'array' : typeof queryEmbedding);
-    console.log('[IPC] Query embedding length:', queryEmbedding.length);
+    safeLog('[IPC] Received semantic search request');
+    safeLog('[IPC] Query embedding type:', Array.isArray(queryEmbedding) ? 'array' : typeof queryEmbedding);
+    safeLog('[IPC] Query embedding length:', queryEmbedding.length);
     
     const allNotes = await db.getAllNotes();
-    console.log('=== Semantic Search Debug ===');
-    console.log('Total notes in database:', allNotes.length);
-    console.log('Query embedding length:', queryEmbedding.length);
+    safeLog('=== Semantic Search Debug ===');
+    safeLog('Total notes in database:', allNotes.length);
+    safeLog('Query embedding length:', queryEmbedding.length);
     
     // Analyze notes and their embeddings
     const notesWithEmbeddings = allNotes.filter(n => {
@@ -684,31 +693,31 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
       try {
         const parsed = JSON.parse(n.embedding);
         if (!Array.isArray(parsed)) {
-          console.warn('Note', n.id, 'has embedding that is not an array');
+          safeLog('Note', n.id, 'has embedding that is not an array');
           return false;
         }
         if (parsed.length === 0) {
-          console.warn('Note', n.id, 'has empty embedding array');
+          safeLog('Note', n.id, 'has empty embedding array');
           return false;
         }
         if (parsed.length !== queryEmbedding.length) {
-          console.warn('Note', n.id, 'has embedding with wrong length:', parsed.length, 'expected:', queryEmbedding.length);
+          safeLog('Note', n.id, 'has embedding with wrong length:', parsed.length, 'expected:', queryEmbedding.length);
           return false;
         }
         return true;
       } catch (e) {
-        console.warn('Failed to parse embedding for note', n.id, ':', e.message);
+        safeLog('Failed to parse embedding for note', n.id, ':', e.message);
         return false;
       }
     });
     
-    console.log('Notes with valid embeddings:', notesWithEmbeddings.length);
+    safeLog('Notes with valid embeddings:', notesWithEmbeddings.length);
     
     if (notesWithEmbeddings.length === 0) {
-      console.warn('⚠️  WARNING: No notes with valid embeddings found!');
-      console.warn('   - This means no notes have embeddings generated yet');
-      console.warn('   - Create or update notes to generate embeddings');
-      console.warn('   - Sample of first note embedding:', allNotes[0]?.embedding ? JSON.parse(allNotes[0].embedding).slice(0, 3) : 'null');
+      safeLog('⚠️  WARNING: No notes with valid embeddings found!');
+      safeLog('   - This means no notes have embeddings generated yet');
+      safeLog('   - Create or update notes to generate embeddings');
+      safeLog('   - Sample of first note embedding:', allNotes[0]?.embedding ? JSON.parse(allNotes[0].embedding).slice(0, 3) : 'null');
       return [];
     }
     
@@ -722,7 +731,7 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
               return null;
             }
           } catch (e) {
-            console.warn('Failed to parse embedding for note', note.id, e);
+            safeLog('Failed to parse embedding for note', note.id, e);
             return null;
           }
         } else {
@@ -736,10 +745,10 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
       })
       .filter(note => note !== null && note.embedding && note.embedding.length > 0);
     
-    console.log('Notes with valid embeddings after filtering:', ranked.length);
+    safeLog('Notes with valid embeddings after filtering:', ranked.length);
     
     if (ranked.length === 0) {
-      console.warn('⚠️  All notes were filtered out during processing');
+      safeLog('⚠️  All notes were filtered out during processing');
       return [];
     }
     
@@ -751,23 +760,23 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
           score,
         };
       } catch (e) {
-        console.error('Error calculating similarity for note', note.id, ':', e);
+        safeError('Error calculating similarity for note', note.id, ':', e);
         return null;
       }
     }).filter(note => note !== null);
     
     const sorted = scored.sort((a, b) => b.score - a.score);
-    console.log('Top 3 results:');
+    safeLog('Top 3 results:');
     sorted.slice(0, 3).forEach((r, i) => {
-      console.log(`  ${i + 1}. ${r.title} (score: ${r.score.toFixed(4)})`);
+      safeLog(`  ${i + 1}. ${r.title} (score: ${r.score.toFixed(4)})`);
     });
-    console.log('=== End Semantic Search Debug ===');
+    safeLog('=== End Semantic Search Debug ===');
     
     // Return results with all note fields plus score
     // The frontend will convert these using sqliteToNote
     return sorted;
   } catch (error) {
-    console.error('Semantic search failed:', error);
+    safeError('Semantic search failed:', error);
     throw error;
   }
 });

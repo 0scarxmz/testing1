@@ -179,6 +179,18 @@ export function NotePageClient() {
       </header>
       
       <main className="container mx-auto p-4 max-w-4xl relative min-h-[calc(100vh-80px)]">
+        {/* Notion-style cover image */}
+        {note?.screenshotPath && (
+          <div className="relative w-full h-[180px] rounded-b-xl overflow-hidden mb-4 -mx-4">
+            <img
+              src={normalizeFilePath(note.screenshotPath)}
+              alt="Note cover"
+              className="w-full h-full object-cover brightness-90"
+            />
+            <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/40 to-transparent"></div>
+          </div>
+        )}
+        
         {/* Background screenshot - clickable to view full size */}
         {note?.screenshotPath && (
           <div 

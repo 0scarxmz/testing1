@@ -39,11 +39,11 @@ export interface DesktopAPI {
   // AI operations
   generateNoteTitle: (content: string) => Promise<string>;
   generateNoteTags: (content: string) => Promise<string[]>;
-  // Quick Capture operations
-  createQuickNote: (content: string) => Promise<{ success: boolean; id: string }>;
-  closeQuickCapture: () => Promise<void>;
   // Screenshot operations
   captureScreenshot: (noteId: string) => Promise<string | null>;
+  // Quick Capture operations
+  updateQuickNote: (content: string) => Promise<{ success: boolean; id: string }>;
+  closeQuickCapture: () => Promise<void>;
 }
 
 declare global {
