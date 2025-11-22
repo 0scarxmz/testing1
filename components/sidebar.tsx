@@ -4,34 +4,48 @@ import { useEffect, useState, useCallback } from 'react';
 import { getAllTags } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { SidebarSearch } from './sidebar-search';
-import { NoteList } from './NoteList';
-import { X, Network } from 'lucide-react';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
-
-interface SidebarProps {
-  onTagClick?: (tag: string) => void;
-}
+import { X } from 'lucide-react';
 
 type SearchMode = 'keyword' | 'semantic';
 
-export function Sidebar({ onTagClick }: SidebarProps) {
+interface SidebarProps {
+  onTagClick?: (tag: string) => void;
+  onSearchChange?: (query: string) => void;
+  onModeChange?: (mode: SearchMode) => void;
+  searchQuery?: string;
+  activeTag?: string | null;
+  searchMode?: SearchMode;
+}
+
+export function Sidebar({ 
+  onTagClick, 
+  onSearchChange, 
+  onModeChange,
+  searchQuery: externalSearchQuery,
+  activeTag: externalActiveTag,
+  searchMode: externalSearchMode
+}: SidebarProps) {
   const [tags, setTags] = useState<string[]>([]);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('keyword');
-  const pathname = usePathname();
+  const [internalActiveTag, setInternalActiveTag] = useState<string | null>(null);
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const [internalSearchMode, setInternalSearchMode] = useState<SearchMode>('keyword');
+  
+  // Use external props if provided, otherwise use internal state
+  const activeTag = externalActiveTag !== undefined ? externalActiveTag : internalActiveTag;
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const searchMode = externalSearchMode !== undefined ? externalSearchMode : internalSearchMode;
 
   useEffect(() => {
     loadTags();
   }, []);
 
-  // Reload tags when navigating back from a note (pathname changes)
+  // Reload tags periodically to catch new tags
   useEffect(() => {
-    if (pathname === '/') {
+    const interval = setInterval(() => {
       loadTags();
-    }
-  }, [pathname]);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function loadTags() {
     try {
@@ -44,62 +58,71 @@ export function Sidebar({ onTagClick }: SidebarProps) {
 
   const handleTagClick = useCallback((tag: string) => {
     if (activeTag === tag) {
-      setActiveTag(null);
+      if (externalActiveTag === undefined) {
+        setInternalActiveTag(null);
+      }
       if (onTagClick) onTagClick('');
     } else {
-      setActiveTag(tag);
+      if (externalActiveTag === undefined) {
+        setInternalActiveTag(tag);
+      }
       if (onTagClick) onTagClick(tag);
     }
-  }, [activeTag, onTagClick]);
+  }, [activeTag, onTagClick, externalActiveTag]);
 
   function handleClearFilter() {
-    setActiveTag(null);
+    if (externalActiveTag === undefined) {
+      setInternalActiveTag(null);
+    }
     if (onTagClick) onTagClick('');
+  }
+
+  function handleSearchChange(query: string) {
+    if (externalSearchQuery === undefined) {
+      setInternalSearchQuery(query);
+    }
+    if (onSearchChange) onSearchChange(query);
+  }
+
+  function handleModeChange(mode: SearchMode) {
+    if (externalSearchMode === undefined) {
+      setInternalSearchMode(mode);
+    }
+    if (onModeChange) onModeChange(mode);
   }
 
   return (
     <div className="w-80 border-r bg-background flex flex-col h-screen">
-      <div className="p-4 border-b">
-        <Link href="/graph">
-          <Button
-            variant={pathname === '/graph' ? 'default' : 'outline'}
-            className="w-full justify-start"
-          >
-            <Network className="mr-2 h-4 w-4" />
-            Graph
-          </Button>
-        </Link>
-      </div>
       <SidebarSearch 
-        onSearchChange={setSearchQuery} 
-        onModeChange={setSearchMode}
+        onSearchChange={handleSearchChange} 
+        onModeChange={handleModeChange}
         searchMode={searchMode}
       />
       
       <div className="flex-1 overflow-y-auto">
         {tags.length > 0 && (
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">Tags</h2>
+          <div className="p-6 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Tags</h2>
               {activeTag && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleClearFilter}
-                  className="h-6 text-xs"
+                  className="h-8 text-sm"
                 >
-                  <X className="h-3 w-3 mr-1" />
+                  <X className="h-4 w-4 mr-1" />
                   Clear
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-2">
               {tags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => handleTagClick(tag)}
                   className={`
-                    text-xs px-2 py-1 rounded-md transition-colors
+                    text-sm px-3 py-1.5 rounded-md transition-colors
                     ${activeTag === tag
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-secondary hover:bg-secondary/80'
@@ -112,21 +135,6 @@ export function Sidebar({ onTagClick }: SidebarProps) {
             </div>
           </div>
         )}
-        
-        <div className="p-2">
-          {(searchQuery || activeTag) && (
-            <div className="text-xs text-muted-foreground px-2 mb-2">
-              Notes (filtered)
-            </div>
-          )}
-          <NoteList 
-            searchQuery={searchQuery} 
-            activeTag={activeTag} 
-            searchMode={searchMode}
-            onTagClick={handleTagClick}
-            onNotesChange={loadTags}
-          />
-        </div>
       </div>
     </div>
   );

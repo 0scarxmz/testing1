@@ -13,6 +13,7 @@ import { extractTags } from '@/lib/tags';
 import { TagInput } from '@/components/tag-input';
 import { RelatedNotes } from '@/components/RelatedNotes';
 import { ScreenshotModal } from '@/components/ScreenshotModal';
+import { CoverImage } from '@/components/CoverImage';
 
 export function NotePageClient() {
   const params = useParams();
@@ -24,6 +25,7 @@ export function NotePageClient() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [coverImagePath, setCoverImagePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
@@ -36,6 +38,7 @@ export function NotePageClient() {
         setTitle(loadedNote.title);
         setContent(loadedNote.content);
         setTags(loadedNote.tags);
+        setCoverImagePath(loadedNote.coverImagePath || null);
       } else {
         router.push('/');
       }
@@ -53,6 +56,7 @@ export function NotePageClient() {
       setTitle('');
       setContent('');
       setTags([]);
+      setCoverImagePath(null);
       setLoading(false);
     } else {
       loadNote();
@@ -98,21 +102,47 @@ export function NotePageClient() {
 
       if (isNew) {
         const { createNote } = await import('@/lib/storage');
+        // Explicitly pass null if coverImagePath is empty, otherwise pass the value
+        const coverImageForCreate = coverImagePath && coverImagePath.trim() !== '' ? coverImagePath : undefined;
         const newNote = await createNote({
           title: title || 'Untitled',
           content,
           tags: allTags,
           embedding,
+          coverImagePath: coverImageForCreate,
         });
+        
+        // If cover image was saved with 'new' as ID, rename it to use the real note ID
+        if (coverImagePath && coverImagePath.includes('new') && typeof window !== 'undefined' && (window as any).desktopAPI) {
+          try {
+            // Copy the file to the new note ID
+            const newPath = await (window as any).desktopAPI.saveCoverImage(coverImagePath, newNote.id);
+            if (newPath) {
+              // Delete the old file with 'new' ID
+              await (window as any).desktopAPI.deleteCoverImage(coverImagePath);
+              // Update the note with the correct path
+              await updateNote(newNote.id, { coverImagePath: newPath });
+            }
+          } catch (error) {
+            console.error('Failed to rename cover image:', error);
+            // Continue anyway - the note is created
+          }
+        }
+        
         router.push(`/notes/${newNote.id}`);
         router.refresh();
       } else if (note) {
+        // Explicitly pass null if coverImagePath is empty, otherwise pass the value
+        const coverImageUpdate = coverImagePath && coverImagePath.trim() !== '' ? coverImagePath : null;
         await updateNote(id, {
           title: title || 'Untitled',
           content,
           tags: allTags,
           embedding,
+          coverImagePath: coverImageUpdate,
         });
+        // Explicitly reload note to refresh state from database
+        await loadNote();
         router.refresh();
       }
     } catch (error) {
@@ -178,10 +208,42 @@ export function NotePageClient() {
         </div>
       </header>
       
-      <main className="container mx-auto p-4 max-w-4xl relative min-h-[calc(100vh-80px)]">
+      <main className="relative min-h-[calc(100vh-80px)]">
+        {/* Cover Image - Full width like Notion */}
+        <div className="w-full">
+          <CoverImage
+            coverImagePath={coverImagePath}
+            onChange={async (path) => {
+              setCoverImagePath(path);
+              // Auto-save cover image immediately when added/changed (like Notion)
+              if (!isNew && note && path) {
+                try {
+                  await updateNote(id, { coverImagePath: path });
+                  // Reload note to get updated data
+                  await loadNote();
+                } catch (err) {
+                  console.error('[NotePage] Failed to auto-save cover image:', err);
+                }
+              } else if (!isNew && note && !path) {
+                // Cover image was removed
+                try {
+                  await updateNote(id, { coverImagePath: null });
+                  await loadNote();
+                } catch (err) {
+                  console.error('[NotePage] Failed to remove cover image:', err);
+                }
+              }
+            }}
+            noteId={isNew ? 'new' : id}
+          />
+        </div>
+        
+        {/* Content container */}
+        <div className="container mx-auto p-8 max-w-5xl relative z-10">
+        
         {/* Notion-style cover image */}
         {note?.screenshotPath && (
-          <div className="relative w-full h-[180px] rounded-b-xl overflow-hidden mb-4 -mx-4">
+          <div className="relative w-full h-[180px] rounded-b-xl overflow-hidden mb-6 -mx-8">
             <img
               src={normalizeFilePath(note.screenshotPath)}
               alt="Note cover"
@@ -212,12 +274,12 @@ export function NotePageClient() {
         )}
         
         {/* Content on top */}
-        <div className="relative z-10 space-y-4">
+        <div className="relative z-10 space-y-6">
           <Input
             placeholder="Note title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="text-2xl font-bold border-0 focus-visible:ring-0 shadow-none bg-transparent"
+            className="text-3xl font-bold border-0 focus-visible:ring-0 shadow-none bg-transparent py-4"
           />
           <div>
             <TagInput tags={tags} onChange={setTags} placeholder="Add tag..." />
@@ -226,6 +288,7 @@ export function NotePageClient() {
           {!isNew && note && note.embedding && (
             <RelatedNotes noteId={note.id} />
           )}
+        </div>
         </div>
       </main>
       {note?.screenshotPath && (

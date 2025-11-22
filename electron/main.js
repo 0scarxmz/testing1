@@ -104,7 +104,7 @@ try {
   console.error('[main] Error logging versions:', e);
 }
 
-const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, dialog } = require('electron');
 
 // Safe logging utility to prevent EPIPE errors
 // Note: console.log/error/warn are already patched at the top of the file
@@ -513,7 +513,8 @@ ipcMain.handle('db:createNote', async (_, data) => {
 });
 
 ipcMain.handle('db:updateNote', async (_, id, updates) => {
-  return await db.updateNote(id, updates);
+  const result = await db.updateNote(id, updates);
+  return result;
 });
 
 ipcMain.handle('db:deleteNote', async (_, id) => {
@@ -788,6 +789,82 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
   } catch (error) {
     safeError('Semantic search failed:', error);
     throw error;
+  }
+});
+
+// Cover Image IPC handlers
+ipcMain.handle('cover-image:selectFile', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  } catch (error) {
+    safeError('[main] Cover image file selection failed:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('cover-image:saveFile', async (_, sourcePath, noteId) => {
+  try {
+    if (!sourcePath || !noteId) {
+      safeError('[main] Cover image save: missing sourcePath or noteId');
+      return null;
+    }
+
+    // Get cover images directory
+    const userDataPath = app.getPath('userData');
+    const coverImagesDir = path.join(userDataPath, 'cover-images');
+
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(coverImagesDir)) {
+      fs.mkdirSync(coverImagesDir, { recursive: true });
+      safeLog('[main] Created cover-images directory:', coverImagesDir);
+    }
+
+    // Get file extension from source file
+    const ext = path.extname(sourcePath).toLowerCase() || '.png';
+    
+    // Generate destination filename: {noteId}.{ext}
+    const filename = `${noteId}${ext}`;
+    const destPath = path.join(coverImagesDir, filename);
+
+    // Copy file
+    fs.copyFileSync(sourcePath, destPath);
+    safeLog('[main] Cover image saved to:', destPath);
+
+    return destPath;
+  } catch (error) {
+    safeError('[main] Cover image save failed:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('cover-image:deleteFile', async (_, imagePath) => {
+  try {
+    if (!imagePath) {
+      return false;
+    }
+
+    if (fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+      safeLog('[main] Cover image deleted:', imagePath);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    safeError('[main] Cover image delete failed:', error);
+    return false;
   }
 });
 

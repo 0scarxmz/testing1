@@ -190,50 +190,66 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
   }
 
   return (
-    <div className="grid gap-4 p-2">
-      {displayNotes.map((note) => (
-        <Link key={note.id} href={`/notes/${note.id}`}>
-          <Card className="hover:bg-accent transition-colors cursor-pointer">
-            <CardHeader>
-              <CardTitle className="line-clamp-1">{note.title || 'Untitled'}</CardTitle>
-              <CardDescription>
-                {format(new Date(note.updatedAt), 'MMM d, yyyy • h:mm a')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {note.screenshotPath && (
-                <div className="mb-3">
+    <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+      {displayNotes.map((note) => {
+        // Prioritize coverImagePath over screenshotPath
+        const thumbnailPath = note.coverImagePath || note.screenshotPath;
+        const thumbnailAlt = note.coverImagePath ? 'Cover' : 'Screenshot';
+        
+        return (
+          <Link key={note.id} href={`/notes/${note.id}`}>
+            <Card className="hover:bg-accent transition-colors cursor-pointer overflow-hidden min-h-[280px] flex flex-col">
+              {/* Thumbnail at top of card */}
+              {thumbnailPath ? (
+                <div className="w-full h-48 overflow-hidden flex-shrink-0">
                   <img
-                    src={normalizeFilePath(note.screenshotPath)}
-                    alt="Screenshot"
-                    className="w-full h-32 object-cover rounded-md shadow-sm"
+                    src={normalizeFilePath(thumbnailPath)}
+                    alt={thumbnailAlt}
+                    className="w-full h-full object-cover"
                     onError={(e) => {
-                      console.error('Failed to load screenshot thumbnail:', note.screenshotPath);
+                      console.error('Failed to load thumbnail:', thumbnailPath);
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
                 </div>
-              )}
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                {getPlainText(note.content)}
-              </p>
-              {note.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {note.tags.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={(e) => handleTagClick(e, tag)}
-                      className="text-xs px-2 py-1 bg-secondary rounded-md hover:bg-secondary/80 transition-colors"
-                    >
-                      #{tag}
-                    </button>
-                  ))}
+              ) : (
+                <div className="w-full h-48 bg-muted/30 flex items-center justify-center flex-shrink-0">
+                  <p className="text-muted-foreground text-xs">No image</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </Link>
-      ))}
+              <CardHeader className="p-4 flex-shrink-0">
+                <CardTitle className="line-clamp-2 text-lg font-semibold">{note.title || 'Untitled'}</CardTitle>
+                <CardDescription className="text-sm mt-1">
+                  {format(new Date(note.updatedAt), 'MMM d, yyyy')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 flex-1 flex flex-col">
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1">
+                  {getPlainText(note.content)}
+                </p>
+                {note.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {note.tags.slice(0, 3).map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={(e) => handleTagClick(e, tag)}
+                        className="text-xs px-2 py-1 bg-secondary rounded-md hover:bg-secondary/80 transition-colors"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                    {note.tags.length > 3 && (
+                      <span className="text-xs text-muted-foreground px-2 py-1">
+                        +{note.tags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+        );
+      })}
     </div>
   );
 }

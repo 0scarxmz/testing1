@@ -44,8 +44,10 @@ try {
       updateQuickNote: (content) => ipcRenderer.invoke('quick-capture:updateNote', content),
       closeQuickCapture: () => ipcRenderer.invoke('quick-capture:close'),
       
-      // Placeholder for future APIs
-      // File operations: will be added later
+      // Cover Image operations
+      selectCoverImage: () => ipcRenderer.invoke('cover-image:selectFile'),
+      saveCoverImage: (sourcePath, noteId) => ipcRenderer.invoke('cover-image:saveFile', sourcePath, noteId),
+      deleteCoverImage: (imagePath) => ipcRenderer.invoke('cover-image:deleteFile', imagePath),
     });
     
     console.log('[preload] desktopAPI exposed successfully');
@@ -64,7 +66,10 @@ try {
       'generateNoteTags',
       'captureScreenshot',
       'updateQuickNote',
-      'closeQuickCapture'
+      'closeQuickCapture',
+      'selectCoverImage',
+      'saveCoverImage',
+      'deleteCoverImage'
     ]);
   } catch (error) {
     console.error('[preload] ERROR: Failed to expose APIs:', error);
