@@ -445,22 +445,49 @@ export async function getRelatedNotes(noteId: string, limit: number = 3): Promis
       return [];
     }
 
+    // Ensure current note embedding is a valid array
+    if (!Array.isArray(currentNote.embedding) || currentNote.embedding.length === 0) {
+      return [];
+    }
+
+    const currentEmbeddingLength = currentNote.embedding.length;
+
     const allNotes = await getAllNotes();
     const otherNotes = allNotes.filter(
-      note => note.id !== noteId && note.embedding !== null && note.embedding !== undefined
+      note => {
+        // Filter out current note and notes without embeddings
+        if (note.id === noteId || !note.embedding) {
+          return false;
+        }
+        
+        // Ensure embedding is a valid array with matching length
+        if (!Array.isArray(note.embedding) || note.embedding.length !== currentEmbeddingLength) {
+          return false;
+        }
+        
+        return true;
+      }
     );
 
     if (otherNotes.length === 0) {
       return [];
     }
 
-    const results: NoteSearchResult[] = otherNotes.map(note => {
-      const similarity = cosineSimilarity(currentNote.embedding!, note.embedding!);
-      return {
-        note,
-        score: similarity,
-      };
-    });
+    const results: NoteSearchResult[] = otherNotes
+      .map(note => {
+        try {
+          const similarity = cosineSimilarity(currentNote.embedding!, note.embedding!);
+          return {
+            note,
+            score: similarity,
+          };
+        } catch (error) {
+          // Skip notes with incompatible embeddings
+          console.warn(`Skipping note ${note.id} due to embedding mismatch:`, error);
+          return null;
+        }
+      })
+      .filter((result): result is NoteSearchResult => result !== null);
 
     results.sort((a, b) => b.score - a.score);
     return results.slice(0, limit);
