@@ -12,6 +12,21 @@ export default function QuickCapturePage() {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
+
+    // Load pending note content (e.g. screenshot markdown)
+    async function loadPendingNote() {
+      if (typeof window !== 'undefined' && (window as any).desktopAPI?.getPendingQuickNote) {
+        try {
+          const note = await (window as any).desktopAPI.getPendingQuickNote();
+          if (note && note.content) {
+            setInput(note.content);
+          }
+        } catch (error) {
+          console.error('Failed to load pending note:', error);
+        }
+      }
+    }
+    loadPendingNote();
   }, []);
 
   async function handleSubmit() {

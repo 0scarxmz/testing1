@@ -1,9 +1,9 @@
 // === Patch console globally to avoid EPIPE crashes ===
 // This MUST be at the very top, before ANY console.log() calls
-const originalConsole = { 
-  log: console.log, 
-  error: console.error, 
-  warn: console.warn 
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn
 };
 
 console.log = (...args) => {
@@ -11,7 +11,7 @@ console.log = (...args) => {
     if (process.stdout.writable && !process.stdout.destroyed) {
       originalConsole.log(...args);
     }
-  } catch (_) {}
+  } catch (_) { }
 };
 
 console.error = (...args) => {
@@ -19,7 +19,7 @@ console.error = (...args) => {
     if (process.stderr.writable && !process.stderr.destroyed) {
       originalConsole.error(...args);
     }
-  } catch (_) {}
+  } catch (_) { }
 };
 
 console.warn = (...args) => {
@@ -27,7 +27,7 @@ console.warn = (...args) => {
     if (process.stdout.writable && !process.stdout.destroyed) {
       originalConsole.warn(...args);
     }
-  } catch (_) {}
+  } catch (_) { }
 };
 // =====================================================
 
@@ -161,12 +161,12 @@ function createWindow() {
     path.join(process.cwd(), 'electron', 'preload.js'),
     path.resolve(__dirname, 'preload.js'),
   ];
-  
+
   console.log('[main] ===== PRELOAD VERIFICATION =====');
   console.log('[main] __dirname:', __dirname);
   console.log('[main] Current working directory:', process.cwd());
   console.log('[main] Testing possible preload paths...');
-  
+
   let preloadPath = null;
   for (const testPath of possiblePaths) {
     console.log('[main] Testing:', testPath);
@@ -178,7 +178,7 @@ function createWindow() {
       console.log('[main] ✗ Not found');
     }
   }
-  
+
   if (!preloadPath) {
     console.error('[main] ===== CRITICAL ERROR =====');
     console.error('[main] Preload not found in any location!');
@@ -187,7 +187,7 @@ function createWindow() {
     // Use the first path anyway - Electron will show the error
     preloadPath = possiblePaths[0];
   }
-  
+
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -203,11 +203,11 @@ function createWindow() {
   win.webContents.on('did-start-loading', () => {
     console.log('[main] Window started loading:', win.webContents.getURL());
   });
-  
+
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[main] Window failed to load:', errorCode, errorDescription, validatedURL);
   });
-  
+
   win.webContents.on('preload-error', (event, preloadPath, error) => {
     console.error('[main] ===== PRELOAD ERROR =====');
     console.error('[main] Path:', preloadPath);
@@ -219,13 +219,13 @@ function createWindow() {
       console.error('[main] Error stack:', error.stack);
     }
   });
-  
+
   win.webContents.on('console-message', (event, level, message, line, sourceId) => {
     if (message.includes('[preload]') || message.includes('[test]')) {
       console.log('[renderer]', message);
     }
   });
-  
+
   // Add DOM ready test - runs before did-finish-load
   win.webContents.once('dom-ready', () => {
     console.log('[main] DOM ready - testing preload...');
@@ -247,7 +247,7 @@ function createWindow() {
       }
     `).catch(err => console.error('[test] Failed to execute test:', err));
   });
-  
+
   win.webContents.on('did-finish-load', () => {
     console.log('[main] Window finished loading');
     // Check if preload script executed and desktopAPI is available
@@ -287,11 +287,11 @@ function createWindow() {
 
   // Determine if we're in development or production
   const isDev = !app.isPackaged;
-  
+
   // URLs for dev and production
   const devUrl = "http://localhost:3000";
   const prodUrl = `file://${path.join(__dirname, "../out/index.html")}`;
-  
+
   if (isDev) {
     // In development, open dev tools
     win.webContents.openDevTools();
@@ -323,7 +323,7 @@ function createQuickCaptureWindow() {
     path.join(process.cwd(), 'electron', 'preload.js'),
     path.resolve(__dirname, 'preload.js'),
   ];
-  
+
   let preloadPath = null;
   for (const testPath of possiblePaths) {
     if (fs.existsSync(testPath)) {
@@ -331,7 +331,7 @@ function createQuickCaptureWindow() {
       break;
     }
   }
-  
+
   if (!preloadPath) {
     preloadPath = possiblePaths[0];
   }
@@ -404,40 +404,43 @@ async function openQuickCapture() {
   isQuickCaptureOpening = true;
 
   safeLog('[main] Quick capture triggered - capturing screenshot first...');
-  
+
   try {
     // Step 1: Generate note ID first
     const { randomUUID } = require('crypto');
     const noteId = randomUUID();
-    
+
     // Step 2: Capture screenshot with note ID
     const screenshotPath = await captureScreenshot(noteId);
-    
     if (!screenshotPath) {
       safeLog('[main] Screenshot capture failed, continuing without screenshot');
     }
 
-    // Step 3: Create note with screenshot (empty content for now)
+    // Step 3: Create note with screenshot
     const now = Date.now();
-    
+
+    // If screenshot exists, add it to content
+    const initialContent = screenshotPath ? `![Screenshot](file://${screenshotPath})\n\n` : '';
+
     await db.createNote({
       id: noteId,
       title: 'untitled',
-      content: '', // Empty initially, will be updated when user submits
+      content: initialContent,
       tags: JSON.stringify([]),
       createdAt: now,
       updatedAt: now,
       embedding: null,
       screenshotPath: screenshotPath || null,
+      coverImagePath: screenshotPath || null, // Set screenshot as cover image
       autoGeneratedTitle: 0,
       autoGeneratedTags: 0,
     });
 
     safeLog('[main] Quick note created with ID', noteId, 'screenshot:', screenshotPath ? 'yes' : 'no');
-    
+
     // Step 3: Store note ID and open window
     pendingQuickNoteId = noteId;
-    
+
     // Open the window - createQuickCaptureWindow handles showing via ready-to-show event
     createQuickCaptureWindow();
   } catch (err) {
@@ -585,6 +588,7 @@ ipcMain.handle('screenshot:capture', async (_, noteId) => {
   }
 });
 
+
 // Quick Capture IPC handlers
 ipcMain.handle('quick-capture:updateNote', async (_, content) => {
   try {
@@ -684,18 +688,24 @@ ipcMain.handle('quick-capture:close', () => {
   pendingQuickNoteId = null;
 });
 
+ipcMain.handle('quick-capture:getPendingNote', async () => {
+  if (!pendingQuickNoteId) return null;
+  return await db.getNote(pendingQuickNoteId);
+});
+
+
 // Semantic search
 ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
   try {
     safeLog('[IPC] Received semantic search request');
     safeLog('[IPC] Query embedding type:', Array.isArray(queryEmbedding) ? 'array' : typeof queryEmbedding);
     safeLog('[IPC] Query embedding length:', queryEmbedding.length);
-    
+
     const allNotes = await db.getAllNotes();
     safeLog('=== Semantic Search Debug ===');
     safeLog('Total notes in database:', allNotes.length);
     safeLog('Query embedding length:', queryEmbedding.length);
-    
+
     // Analyze notes and their embeddings
     const notesWithEmbeddings = allNotes.filter(n => {
       if (!n.embedding) {
@@ -721,9 +731,9 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
         return false;
       }
     });
-    
+
     safeLog('Notes with valid embeddings:', notesWithEmbeddings.length);
-    
+
     if (notesWithEmbeddings.length === 0) {
       safeLog('⚠️  WARNING: No notes with valid embeddings found!');
       safeLog('   - This means no notes have embeddings generated yet');
@@ -731,7 +741,7 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
       safeLog('   - Sample of first note embedding:', allNotes[0]?.embedding ? JSON.parse(allNotes[0].embedding).slice(0, 3) : 'null');
       return [];
     }
-    
+
     const ranked = allNotes
       .map(note => {
         let embedding = [];
@@ -748,21 +758,21 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
         } else {
           return null;
         }
-        
+
         return {
           ...note,
           embedding,
         };
       })
       .filter(note => note !== null && note.embedding && note.embedding.length > 0);
-    
+
     safeLog('Notes with valid embeddings after filtering:', ranked.length);
-    
+
     if (ranked.length === 0) {
       safeLog('⚠️  All notes were filtered out during processing');
       return [];
     }
-    
+
     const scored = ranked.map(note => {
       try {
         const score = cosineSimilarity(queryEmbedding, note.embedding);
@@ -775,14 +785,14 @@ ipcMain.handle('embeddings:semanticSearch', async (_, queryEmbedding) => {
         return null;
       }
     }).filter(note => note !== null);
-    
+
     const sorted = scored.sort((a, b) => b.score - a.score);
     safeLog('Top 3 results:');
     sorted.slice(0, 3).forEach((r, i) => {
       safeLog(`  ${i + 1}. ${r.title} (score: ${r.score.toFixed(4)})`);
     });
     safeLog('=== End Semantic Search Debug ===');
-    
+
     // Return results with all note fields plus score
     // The frontend will convert these using sqliteToNote
     return sorted;
@@ -833,7 +843,7 @@ ipcMain.handle('cover-image:saveFile', async (_, sourcePath, noteId) => {
 
     // Get file extension from source file
     const ext = path.extname(sourcePath).toLowerCase() || '.png';
-    
+
     // Generate destination filename: {noteId}.{ext}
     const filename = `${noteId}${ext}`;
     const destPath = path.join(coverImagesDir, filename);
@@ -848,6 +858,7 @@ ipcMain.handle('cover-image:saveFile', async (_, sourcePath, noteId) => {
     return null;
   }
 });
+
 
 ipcMain.handle('cover-image:deleteFile', async (_, imagePath) => {
   try {
@@ -867,4 +878,43 @@ ipcMain.handle('cover-image:deleteFile', async (_, imagePath) => {
     return false;
   }
 });
+
+// Generic Image Saving (for editor content)
+ipcMain.handle('image:save', async (_, arrayBuffer, filename) => {
+  try {
+    if (!arrayBuffer || !filename) {
+      safeError('[main] Image save: missing data or filename');
+      return null;
+    }
+
+    // Get images directory
+    const userDataPath = app.getPath('userData');
+    const imagesDir = path.join(userDataPath, 'images');
+
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(imagesDir)) {
+      fs.mkdirSync(imagesDir, { recursive: true });
+      safeLog('[main] Created images directory:', imagesDir);
+    }
+
+    // Generate unique filename to prevent collisions
+    const ext = path.extname(filename).toLowerCase() || '.png';
+    const name = path.basename(filename, ext);
+    const { randomUUID } = require('crypto');
+    const uniqueFilename = `${name}-${randomUUID()}${ext}`;
+    const destPath = path.join(imagesDir, uniqueFilename);
+
+    // Write file
+    fs.writeFileSync(destPath, Buffer.from(arrayBuffer));
+    safeLog('[main] Image saved to:', destPath);
+
+    // Return the absolute path (or a protocol URL if we set up a custom protocol later)
+    // For now, returning absolute path which Electron can load if webSecurity is false
+    return destPath;
+  } catch (error) {
+    safeError('[main] Image save failed:', error);
+    return null;
+  }
+});
+
 

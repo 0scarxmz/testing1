@@ -29,6 +29,7 @@ export function NotePageClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const loadNote = useCallback(async () => {
     try {
@@ -60,15 +61,24 @@ export function NotePageClient() {
       setLoading(false);
     } else {
       loadNote();
-      
+
       // Poll for updates every 3 seconds to catch screenshot and AI-generated content
       const interval = setInterval(() => {
         loadNote();
       }, 3000);
-      
+
       return () => clearInterval(interval);
     }
   }, [id, isNew, loadNote]);
+
+  // Auto-enable edit mode for new notes
+  useEffect(() => {
+    if (isNew) {
+      setIsEditing(true);
+    } else {
+      setIsEditing(false); // Ensure edit mode is off for existing notes
+    }
+  }, [isNew]);
 
   async function handleSave() {
     if (saving) return;
@@ -111,7 +121,7 @@ export function NotePageClient() {
           embedding,
           coverImagePath: coverImageForCreate,
         });
-        
+
         // If cover image was saved with 'new' as ID, rename it to use the real note ID
         if (coverImagePath && coverImagePath.includes('new') && typeof window !== 'undefined' && (window as any).desktopAPI) {
           try {
@@ -128,12 +138,12 @@ export function NotePageClient() {
             // Continue anyway - the note is created
           }
         }
-        
+
         router.push(`/notes/${newNote.id}`);
         router.refresh();
       } else if (note) {
-        // Explicitly pass null if coverImagePath is empty, otherwise pass the value
-        const coverImageUpdate = coverImagePath && coverImagePath.trim() !== '' ? coverImagePath : null;
+        // Explicitly pass undefined if coverImagePath is empty, otherwise pass the value
+        const coverImageUpdate = coverImagePath && coverImagePath.trim() !== '' ? coverImagePath : undefined;
         await updateNote(id, {
           title: title || 'Untitled',
           content,
@@ -183,114 +193,154 @@ export function NotePageClient() {
     return normalizedPath;
   }
 
+
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-          <div className="flex gap-2">
+    <div className="min-h-screen bg-background font-sans">
+      {/* Header / Navigation */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40 transition-all duration-200">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/" className="hover:text-foreground transition-colors flex items-center gap-1">
+              <span className="opacity-50">/</span> Home
+            </Link>
+            <span className="opacity-30">/</span>
+            <span className="truncate max-w-[200px] font-medium text-foreground">{title || 'Untitled'}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
             {!isNew && (
-              <Button variant="destructive" size="sm" onClick={handleDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+                className={isEditing ? "text-primary" : "text-muted-foreground"}
+              >
+                {isEditing ? 'Done' : 'Edit'}
               </Button>
             )}
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            {!isNew && isEditing && (
+              <Button variant="ghost" size="sm" onClick={handleDelete} className="text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            {isEditing && (
+              <Button size="sm" onClick={handleSave} disabled={saving} className={saving ? 'opacity-70' : ''}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            )}
           </div>
         </div>
       </header>
-      
-      <main className="relative min-h-[calc(100vh-80px)]">
-        {/* Cover Image - Full width like Notion */}
-        <div className="w-full">
+
+      <main className="relative min-h-screen pb-32 pt-14">
+        {/* Cover Image Area */}
+        <div className="group relative w-full h-[30vh] min-h-[200px] bg-secondary/30 border-b border-border/50">
           <CoverImage
             coverImagePath={coverImagePath}
+            editable={isEditing}
             onChange={async (path) => {
+              console.log('[NotePage] Cover image onChange called with path:', path);
+              console.log('[NotePage] isNew:', isNew, 'note:', note?.id);
+
               setCoverImagePath(path);
-              // Auto-save cover image immediately when added/changed (like Notion)
+
               if (!isNew && note && path) {
                 try {
-                  await updateNote(id, { coverImagePath: path });
-                  // Reload note to get updated data
+                  console.log('[NotePage] Updating note with coverImagePath:', path);
+                  const result = await updateNote(id, { coverImagePath: path });
+                  console.log('[NotePage] Update result:', result);
+
+                  console.log('[NotePage] Reloading note...');
                   await loadNote();
+                  console.log('[NotePage] Note reloaded, new coverImagePath:', coverImagePath);
                 } catch (err) {
                   console.error('[NotePage] Failed to auto-save cover image:', err);
                 }
               } else if (!isNew && note && !path) {
-                // Cover image was removed
                 try {
-                  await updateNote(id, { coverImagePath: null });
+                  console.log('[NotePage] Removing cover image');
+                  await updateNote(id, { coverImagePath: undefined });
                   await loadNote();
                 } catch (err) {
                   console.error('[NotePage] Failed to remove cover image:', err);
                 }
+              } else {
+                console.log('[NotePage] Skipping database update - isNew or no note');
               }
             }}
             noteId={isNew ? 'new' : id}
           />
-        </div>
-        
-        {/* Content container */}
-        <div className="container mx-auto p-8 max-w-5xl relative z-10">
-        
-        {/* Notion-style cover image */}
-        {note?.screenshotPath && (
-          <div className="relative w-full h-[180px] rounded-b-xl overflow-hidden mb-6 -mx-8">
-            <img
-              src={normalizeFilePath(note.screenshotPath)}
-              alt="Note cover"
-              className="w-full h-full object-cover brightness-90"
-            />
-            <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/40 to-transparent"></div>
-          </div>
-        )}
-        
-        {/* Background screenshot - clickable to view full size */}
-        {note?.screenshotPath && (
-          <div 
-            className="absolute inset-0 -z-10 opacity-20 blur-sm rounded-lg cursor-pointer hover:opacity-30 transition-opacity"
-            style={{
-              backgroundImage: `url(${normalizeFilePath(note.screenshotPath)})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat'
-            }}
-            onClick={() => setScreenshotModalOpen(true)}
-            title="Click to view full screenshot"
-          />
-        )}
-        
-        {/* Semi-transparent overlay for readability */}
-        {note?.screenshotPath && (
-          <div className="absolute inset-0 -z-10 bg-background/70 rounded-lg" />
-        )}
-        
-        {/* Content on top */}
-        <div className="relative z-10 space-y-6">
-          <Input
-            placeholder="Note title..."
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="text-3xl font-bold border-0 focus-visible:ring-0 shadow-none bg-transparent py-4"
-          />
-          <div>
-            <TagInput tags={tags} onChange={setTags} placeholder="Add tag..." />
-          </div>
-          <MarkdownEditor content={content} onChange={setContent} />
-          {!isNew && note && note.embedding && (
-            <RelatedNotes noteId={note.id} />
+
+          {/* Gradient overlay for text readability if needed */}
+          {coverImagePath && (
+            <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent pointer-events-none" />
           )}
         </div>
+
+        {/* Content Container */}
+        <div className="max-w-4xl mx-auto px-8 relative">
+
+          {/* Icon / Emoji */}
+          <div className="-mt-12 mb-8 relative z-10 ml-2">
+            <div className="text-7xl drop-shadow-sm cursor-pointer hover:opacity-80 transition-opacity">
+              📝
+            </div>
+          </div>
+
+          {/* Title Input */}
+          <div className="mb-6 group">
+            {isEditing ? (
+              <Input
+                placeholder="Untitled"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-5xl font-bold font-serif border-0 focus-visible:ring-0 shadow-none bg-transparent p-0 h-auto placeholder:text-muted-foreground/40"
+              />
+            ) : (
+              <h1 className="text-5xl font-bold font-serif py-2">{title || 'Untitled'}</h1>
+            )}
+          </div>
+
+          {/* Metadata / Tags */}
+          <div className="flex items-center gap-4 mb-8 text-sm text-muted-foreground border-b border-border/40 pb-6">
+            <div className="flex items-center gap-2 min-w-[100px]">
+              <span className="opacity-60">Tags</span>
+            </div>
+            <div className="flex-1">
+              {isEditing ? (
+                <TagInput tags={tags} onChange={setTags} placeholder="Empty" />
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {tags.length > 0 ? tags.map(tag => (
+                    <span key={tag} className="bg-secondary px-2 py-1 rounded-md text-xs">#{tag}</span>
+                  )) : <span className="opacity-50 italic">No tags</span>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Editor */}
+          <div className={`min-h-[400px] ${!isEditing ? 'pointer-events-none' : ''}`}>
+            <MarkdownEditor
+              content={content}
+              onChange={setContent}
+              editable={isEditing}
+            />
+          </div>
+
+          {/* Related Notes */}
+          {!isNew && note && note.embedding && (
+            <div className="mt-16 pt-8 border-t border-border/40">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Related Notes</h3>
+              <RelatedNotes noteId={note.id} />
+            </div>
+          )}
         </div>
       </main>
+
+      {/* Screenshot Modal */}
       {note?.screenshotPath && (
         <ScreenshotModal
           open={screenshotModalOpen}

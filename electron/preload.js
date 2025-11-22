@@ -16,7 +16,7 @@ try {
     // Expose Electron flag first
     contextBridge.exposeInMainWorld('__IS_ELECTRON__', true);
     console.log('[preload] Electron flag exposed');
-    
+
     // Expose desktopAPI
     contextBridge.exposeInMainWorld('desktopAPI', {
       // Database operations
@@ -28,28 +28,32 @@ try {
       getNotesByTag: (tag) => ipcRenderer.invoke('db:getNotesByTag', tag),
       searchNotesByText: (query) => ipcRenderer.invoke('db:searchNotesByText', query),
       getAllTags: () => ipcRenderer.invoke('db:getAllTags'),
-      
+
       // Embedding operations
       generateEmbedding: (text) => ipcRenderer.invoke('embeddings:generate', text),
       semanticSearch: (queryEmbedding) => ipcRenderer.invoke('embeddings:semanticSearch', queryEmbedding),
-      
+
       // AI operations
       generateNoteTitle: (content) => ipcRenderer.invoke('ai:generateTitle', content),
       generateNoteTags: (content) => ipcRenderer.invoke('ai:generateTags', content),
-      
+
       // Screenshot operations
       captureScreenshot: (noteId) => ipcRenderer.invoke('screenshot:capture', noteId),
-      
+
       // Quick Capture operations
       updateQuickNote: (content) => ipcRenderer.invoke('quick-capture:updateNote', content),
       closeQuickCapture: () => ipcRenderer.invoke('quick-capture:close'),
-      
+      getPendingQuickNote: () => ipcRenderer.invoke('quick-capture:getPendingNote'),
+
       // Cover Image operations
       selectCoverImage: () => ipcRenderer.invoke('cover-image:selectFile'),
       saveCoverImage: (sourcePath, noteId) => ipcRenderer.invoke('cover-image:saveFile', sourcePath, noteId),
       deleteCoverImage: (imagePath) => ipcRenderer.invoke('cover-image:deleteFile', imagePath),
+
+      // General Image operations
+      saveImage: (arrayBuffer, filename) => ipcRenderer.invoke('image:save', arrayBuffer, filename),
     });
-    
+
     console.log('[preload] desktopAPI exposed successfully');
     console.log('[preload] Available methods:', [
       'getNotes',
@@ -76,7 +80,7 @@ try {
     console.error('[preload] Error stack:', error.stack);
     throw error;
   }
-  
+
   console.log('[preload] ===== PRELOAD SCRIPT COMPLETE =====');
 } catch (error) {
   console.error('[preload] ===== PRELOAD SCRIPT FAILED =====');

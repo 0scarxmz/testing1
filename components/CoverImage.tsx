@@ -8,27 +8,42 @@ interface CoverImageProps {
   coverImagePath?: string | null;
   onChange: (path: string | null) => void;
   noteId: string;
+  editable?: boolean;
 }
 
 function normalizeFilePath(filePath: string): string {
+  if (!filePath) return '';
   if (filePath.startsWith('http')) {
     return filePath;
   }
+
   // Normalize path: convert backslashes to forward slashes
   let normalizedPath = filePath.replace(/\\/g, '/');
+
+  // Handle spaces and special characters for URL
+  // We need to encode the path parts but keep the slashes
+  // normalizedPath = normalizedPath.split('/').map(part => encodeURIComponent(part)).join('/');
+
   // Ensure it starts with file:// (three slashes for absolute paths)
   if (!normalizedPath.startsWith('file://')) {
-    normalizedPath = `file:///${normalizedPath}`;
+    if (normalizedPath.startsWith('/')) {
+      normalizedPath = `file://${normalizedPath}`;
+    } else {
+      normalizedPath = `file:///${normalizedPath}`;
+    }
   }
+
   return normalizedPath;
 }
 
-export function CoverImage({ coverImagePath, onChange, noteId }: CoverImageProps) {
+export function CoverImage({ coverImagePath, onChange, noteId, editable = true }: CoverImageProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const handleAddCover = async () => {
+    if (!editable) return;
+
     if (typeof window === 'undefined' || !(window as any).desktopAPI) {
       console.error('desktopAPI is not available');
       return;
@@ -38,15 +53,24 @@ export function CoverImage({ coverImagePath, onChange, noteId }: CoverImageProps
     try {
       // Step 1: Select file
       const selectedPath = await (window as any).desktopAPI.selectCoverImage();
+
       if (!selectedPath) {
         setIsLoading(false);
         return; // User cancelled
       }
 
+      console.log('[CoverImage] Selected path:', selectedPath);
+
       // Step 2: Save file
       const savedPath = await (window as any).desktopAPI.saveCoverImage(selectedPath, noteId);
+      console.log('[CoverImage] Saved path:', savedPath);
+
       if (savedPath) {
+        // Force a small delay to ensure file system write is complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log('[CoverImage] About to call onChange with savedPath:', savedPath);
         onChange(savedPath);
+        console.log('[CoverImage] onChange called successfully');
       } else {
         console.error('[CoverImage] Failed to save cover image - savedPath is null/undefined');
       }
@@ -58,6 +82,7 @@ export function CoverImage({ coverImagePath, onChange, noteId }: CoverImageProps
   };
 
   const handleChangeCover = async () => {
+    if (!editable) return;
     // Delete old image first
     if (coverImagePath) {
       try {
@@ -74,6 +99,7 @@ export function CoverImage({ coverImagePath, onChange, noteId }: CoverImageProps
   };
 
   const handleRemoveCover = async () => {
+    if (!editable) return;
     if (!coverImagePath) return;
 
     setIsLoading(true);
@@ -91,8 +117,10 @@ export function CoverImage({ coverImagePath, onChange, noteId }: CoverImageProps
     }
   };
 
-  // No cover image - show "Add cover" button
+  // No cover image
   if (!coverImagePath) {
+    if (!editable) return null; // Don't show anything in read mode if no cover
+
     return (
       <div className="w-full h-[280px] bg-muted/30 border-b border-dashed border-muted-foreground/20 flex items-center justify-center">
         <Button
@@ -130,8 +158,8 @@ export function CoverImage({ coverImagePath, onChange, noteId }: CoverImageProps
         </div>
       )}
 
-      {/* Hover overlay with controls */}
-      {isHovered && !isLoading && (
+      {/* Hover overlay with controls - ONLY IF EDITABLE */}
+      {isHovered && !isLoading && editable && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2 transition-opacity">
           <Button
             variant="secondary"

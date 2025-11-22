@@ -14,7 +14,7 @@ function getPlainText(content: string): string {
   // First, try to convert markdown to HTML, then strip HTML tags
   // This handles both old HTML content and new Markdown content
   let html = content;
-  
+
   // If it looks like markdown (has markdown syntax), convert it
   if (content.includes('**') || content.includes('*') || content.includes('#') || content.includes('`')) {
     try {
@@ -24,7 +24,7 @@ function getPlainText(content: string): string {
       html = content;
     }
   }
-  
+
   // Strip HTML tags
   return html.replace(/<[^>]*>/g, '').trim();
 }
@@ -46,12 +46,12 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
 
   useEffect(() => {
     loadNotes();
-    
+
     // Poll for updates every 5 seconds to catch async AI-generated titles/tags
     const interval = setInterval(() => {
       loadNotes();
     }, 5000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -89,7 +89,7 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
       setSearching(true);
       try {
         let results: Note[] = [];
-        
+
         if (searchMode === 'semantic') {
           console.log('Performing semantic search for:', searchQuery);
           const semanticResults = await searchNotesSemantic(searchQuery);
@@ -190,56 +190,57 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
   }
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+    <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
       {displayNotes.map((note) => {
         // Prioritize coverImagePath over screenshotPath
         const thumbnailPath = note.coverImagePath || note.screenshotPath;
         const thumbnailAlt = note.coverImagePath ? 'Cover' : 'Screenshot';
-        
+
         return (
           <Link key={note.id} href={`/notes/${note.id}`}>
-            <Card className="hover:bg-accent transition-colors cursor-pointer overflow-hidden min-h-[280px] flex flex-col">
+            <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden min-h-[260px] flex flex-col border-border/60 bg-card/50 hover:bg-card">
               {/* Thumbnail at top of card */}
               {thumbnailPath ? (
-                <div className="w-full h-48 overflow-hidden flex-shrink-0">
+                <div className="w-full h-40 overflow-hidden flex-shrink-0 relative">
                   <img
                     src={normalizeFilePath(thumbnailPath)}
                     alt={thumbnailAlt}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     onError={(e) => {
                       console.error('Failed to load thumbnail:', thumbnailPath);
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
+                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-10 transition-opacity" />
                 </div>
               ) : (
-                <div className="w-full h-48 bg-muted/30 flex items-center justify-center flex-shrink-0">
-                  <p className="text-muted-foreground text-xs">No image</p>
+                <div className="w-full h-40 bg-secondary/50 flex items-center justify-center flex-shrink-0">
+                  <span className="text-4xl opacity-20">📝</span>
                 </div>
               )}
-              <CardHeader className="p-4 flex-shrink-0">
-                <CardTitle className="line-clamp-2 text-lg font-semibold">{note.title || 'Untitled'}</CardTitle>
-                <CardDescription className="text-sm mt-1">
+              <CardHeader className="p-4 pb-2 flex-shrink-0">
+                <CardTitle className="line-clamp-1 text-base font-bold font-serif tracking-tight">{note.title || 'Untitled'}</CardTitle>
+                <CardDescription className="text-xs mt-1 font-mono opacity-70">
                   {format(new Date(note.updatedAt), 'MMM d, yyyy')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0 flex-1 flex flex-col">
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1">
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1 font-sans leading-relaxed">
                   {getPlainText(note.content)}
                 </p>
                 {note.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5 mt-auto pt-2">
                     {note.tags.slice(0, 3).map((tag) => (
                       <button
                         key={tag}
                         onClick={(e) => handleTagClick(e, tag)}
-                        className="text-xs px-2 py-1 bg-secondary rounded-md hover:bg-secondary/80 transition-colors"
+                        className="text-[10px] px-2 py-0.5 bg-secondary text-secondary-foreground rounded-full hover:bg-primary/10 hover:text-primary transition-colors border border-transparent hover:border-primary/20"
                       >
                         #{tag}
                       </button>
                     ))}
                     {note.tags.length > 3 && (
-                      <span className="text-xs text-muted-foreground px-2 py-1">
+                      <span className="text-[10px] text-muted-foreground px-1">
                         +{note.tags.length - 3}
                       </span>
                     )}
