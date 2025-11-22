@@ -379,6 +379,8 @@ function createQuickCaptureWindow() {
   return win;
 }
 
+let isQuickCaptureOpening = false;
+
 // Quick Capture: Capture screenshot, create note, then open window
 async function openQuickCapture() {
   // Only work on Mac
@@ -386,6 +388,13 @@ async function openQuickCapture() {
     safeLog('[main] Quick capture only available on Mac');
     return;
   }
+
+  // prevent double-trigger if shortcut is pressed twice quickly
+  if (isQuickCaptureOpening) {
+    safeLog('[main] Quick capture already in progress, ignoring second trigger');
+    return;
+  }
+  isQuickCaptureOpening = true;
 
   safeLog('[main] Quick capture triggered - capturing screenshot first...');
   
@@ -426,6 +435,8 @@ async function openQuickCapture() {
     createQuickCaptureWindow();
   } catch (err) {
     safeError('[main] Quick capture error:', err);
+  } finally {
+    isQuickCaptureOpening = false;
   }
 }
 
