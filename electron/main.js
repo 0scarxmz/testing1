@@ -147,6 +147,13 @@ let quickCaptureWindow = null;
 let pendingQuickNoteId = null; // Store note ID created with screenshot
 
 function createWindow() {
+  // Guard: Reuse existing main window if it exists and isn't destroyed
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+    return mainWindow;
+  }
+
   // Verify preload path - try multiple possible locations
   const fs = require('fs');
   const possiblePaths = [
@@ -295,7 +302,7 @@ function createWindow() {
 
   // Handle window closed
   win.on('closed', () => {
-    // Dereference the window object
+    mainWindow = null;  // Clear the reference when window is closed
   });
 
   mainWindow = win;
