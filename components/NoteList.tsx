@@ -190,57 +190,77 @@ export function NoteList({ searchQuery = '', activeTag = null, searchMode = 'key
   }
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
-      {displayNotes.map((note) => {
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+      {displayNotes.map((note, index) => {
         // Prioritize coverImagePath over screenshotPath
         const thumbnailPath = note.coverImagePath || note.screenshotPath;
         const thumbnailAlt = note.coverImagePath ? 'Cover' : 'Screenshot';
 
         return (
-          <Link key={note.id} href={`/notes/${note.id}`}>
-            <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden min-h-[260px] flex flex-col border-border/60 bg-card/50 hover:bg-card">
+          <Link
+            key={note.id}
+            href={`/notes/${note.id}`}
+            className="animate-in fade-in zoom-in-95 duration-500 fill-mode-forwards"
+            style={{ animationDelay: `${index * 50}ms` }}
+          >
+            <Card className="group h-full flex flex-col overflow-hidden border border-border/40 bg-card hover:bg-card/80 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-xl">
               {/* Thumbnail at top of card */}
-              {thumbnailPath ? (
-                <div className="w-full h-40 overflow-hidden flex-shrink-0 relative">
-                  <img
-                    src={normalizeFilePath(thumbnailPath)}
-                    alt={thumbnailAlt}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    onError={(e) => {
-                      console.error('Failed to load thumbnail:', thumbnailPath);
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-10 transition-opacity" />
+              <div className="w-full h-48 overflow-hidden flex-shrink-0 relative bg-muted/30">
+                {thumbnailPath ? (
+                  <>
+                    <img
+                      src={normalizeFilePath(thumbnailPath)}
+                      alt={thumbnailAlt}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      onError={(e) => {
+                        // Silently hide broken images
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        // Show placeholder instead
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-4xl opacity-10">📝</div>';
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-4xl opacity-10 group-hover:opacity-20 transition-opacity">
+                    📝
+                  </div>
+                )}
+              </div>
+
+              <CardHeader className="p-5 pb-2 flex-shrink-0">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="line-clamp-1 text-lg font-semibold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                    {note.title || 'Untitled'}
+                  </CardTitle>
                 </div>
-              ) : (
-                <div className="w-full h-40 bg-secondary/50 flex items-center justify-center flex-shrink-0">
-                  <span className="text-4xl opacity-20">📝</span>
-                </div>
-              )}
-              <CardHeader className="p-4 pb-2 flex-shrink-0">
-                <CardTitle className="line-clamp-1 text-base font-bold font-serif tracking-tight">{note.title || 'Untitled'}</CardTitle>
-                <CardDescription className="text-xs mt-1 font-mono opacity-70">
+                <CardDescription className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider mt-1">
                   {format(new Date(note.updatedAt), 'MMM d, yyyy')}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-4 pt-0 flex-1 flex flex-col">
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1 font-sans leading-relaxed">
-                  {getPlainText(note.content)}
+
+              <CardContent className="p-5 pt-2 flex-1 flex flex-col">
+                <p className="text-sm text-muted-foreground line-clamp-3 mb-4 flex-1 leading-relaxed">
+                  {getPlainText(note.content) || <span className="italic opacity-50">No content</span>}
                 </p>
+
                 {note.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-auto pt-2">
+                  <div className="flex flex-wrap gap-2 mt-auto pt-2 border-t border-border/30">
                     {note.tags.slice(0, 3).map((tag) => (
                       <button
                         key={tag}
                         onClick={(e) => handleTagClick(e, tag)}
-                        className="text-[10px] px-2 py-0.5 bg-secondary text-secondary-foreground rounded-full hover:bg-primary/10 hover:text-primary transition-colors border border-transparent hover:border-primary/20"
+                        className="text-[10px] font-medium px-2 py-1 bg-secondary/50 text-secondary-foreground rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         #{tag}
                       </button>
                     ))}
                     {note.tags.length > 3 && (
-                      <span className="text-[10px] text-muted-foreground px-1">
+                      <span className="text-[10px] text-muted-foreground px-1 self-center">
                         +{note.tags.length - 3}
                       </span>
                     )}

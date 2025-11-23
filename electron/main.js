@@ -106,6 +106,9 @@ try {
 
 const { app, BrowserWindow, ipcMain, globalShortcut, screen, dialog } = require('electron');
 
+// Set app name for dock/taskbar
+app.setName('Noteshot');
+
 // Safe logging utility to prevent EPIPE errors
 // Note: console.log/error/warn are already patched at the top of the file
 function safeLog(...args) {
@@ -191,6 +194,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
+    icon: path.join(__dirname, 'icon.png'),
+    title: 'Noteshot',
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -354,6 +359,8 @@ function createQuickCaptureWindow() {
     skipTaskbar: true,
     show: false,  // keep hidden until ready
     backgroundColor: '#ffffff',
+    icon: path.join(__dirname, 'icon.png'),
+    title: 'Noteshot - Quick Capture',
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,

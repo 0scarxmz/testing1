@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Image, X, Upload } from 'lucide-react';
 
@@ -40,6 +40,7 @@ export function CoverImage({ coverImagePath, onChange, noteId, editable = true }
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const handleAddCover = async () => {
     if (!editable) return;
@@ -139,17 +140,30 @@ export function CoverImage({ coverImagePath, onChange, noteId, editable = true }
   // Has cover image - show image with hover overlay
   const imageUrl = normalizeFilePath(coverImagePath);
 
+  // Reset imageLoaded when coverImagePath changes
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [coverImagePath]);
+
   return (
     <div
-      className="relative w-full h-[280px] overflow-hidden group"
+      className="relative w-full h-[280px] overflow-hidden group bg-muted/20"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Loading Placeholder / Blur Effect */}
+      <div
+        className={`absolute inset-0 bg-muted transition-opacity duration-700 ${imageLoaded ? 'opacity-0' : 'opacity-100'}`}
+        style={{ backdropFilter: 'blur(10px)' }}
+      />
+
       {!imageError ? (
         <img
           src={imageUrl}
           alt="Cover"
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setImageLoaded(true)}
           onError={() => setImageError(true)}
         />
       ) : (
@@ -160,13 +174,13 @@ export function CoverImage({ coverImagePath, onChange, noteId, editable = true }
 
       {/* Hover overlay with controls - ONLY IF EDITABLE */}
       {isHovered && !isLoading && editable && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2 transition-opacity">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center gap-2 transition-all duration-300 animate-in fade-in">
           <Button
             variant="secondary"
             size="sm"
             onClick={handleChangeCover}
             disabled={isLoading}
-            className="gap-2"
+            className="gap-2 shadow-lg hover:scale-105 transition-transform"
           >
             <Image className="h-4 w-4" />
             Change
@@ -176,7 +190,7 @@ export function CoverImage({ coverImagePath, onChange, noteId, editable = true }
             size="sm"
             onClick={handleRemoveCover}
             disabled={isLoading}
-            className="gap-2"
+            className="gap-2 shadow-lg hover:scale-105 transition-transform"
           >
             <X className="h-4 w-4" />
             Remove
@@ -186,13 +200,13 @@ export function CoverImage({ coverImagePath, onChange, noteId, editable = true }
 
       {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <div className="text-white">Loading...</div>
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-10">
+          <div className="text-white font-medium animate-pulse">Loading...</div>
         </div>
       )}
 
       {/* Subtle gradient overlay at bottom for text readability */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background/80 via-background/20 to-transparent pointer-events-none" />
     </div>
   );
 }

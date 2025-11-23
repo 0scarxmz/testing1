@@ -7,6 +7,8 @@ export default function QuickCapturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [noteId, setNoteId] = useState<string | null>(null);
+
   useEffect(() => {
     // Auto-focus textarea on mount
     if (textareaRef.current) {
@@ -18,8 +20,11 @@ export default function QuickCapturePage() {
       if (typeof window !== 'undefined' && (window as any).desktopAPI?.getPendingQuickNote) {
         try {
           const note = await (window as any).desktopAPI.getPendingQuickNote();
-          if (note && note.content) {
-            setInput(note.content);
+          if (note) {
+            setNoteId(note.id);
+            if (note.content) {
+              setInput(note.content);
+            }
           }
         } catch (error) {
           console.error('Failed to load pending note:', error);
@@ -48,13 +53,24 @@ export default function QuickCapturePage() {
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  async function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSubmit();
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+
+      // Delete the temporary note if cancelled
+      if (noteId && typeof window !== 'undefined' && (window as any).desktopAPI?.deleteNote) {
+        try {
+          console.log('Cancelling quick note, deleting:', noteId);
+          await (window as any).desktopAPI.deleteNote(noteId);
+        } catch (error) {
+          console.error('Failed to delete cancelled note:', error);
+        }
+      }
+
       if (typeof window !== 'undefined' && (window as any).desktopAPI?.closeQuickCapture) {
         (window as any).desktopAPI.closeQuickCapture();
       }

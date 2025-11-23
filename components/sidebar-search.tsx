@@ -31,15 +31,15 @@ export function SidebarSearch({ onSearchChange, onModeChange, searchMode = 'keyw
   }
 
   return (
-    <div className="p-6 border-b space-y-3">
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+    <div className="p-4 space-y-3">
+      <div className="relative group">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
         <Input
           type="text"
-          placeholder="🔍 Search notes..."
+          placeholder="Search notes..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-11 pr-11 h-11 text-base"
+          className="pl-9 pr-9 h-9 text-sm bg-secondary/50 border-transparent focus:bg-background focus:border-primary/20 focus:ring-1 focus:ring-primary/20 transition-all rounded-md shadow-sm"
         />
         {query && (
           <Button
@@ -47,34 +47,33 @@ export function SidebarSearch({ onSearchChange, onModeChange, searchMode = 'keyw
             variant="ghost"
             size="icon"
             onClick={handleClear}
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-9 w-9"
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 hover:bg-transparent"
           >
-            <X className="h-5 w-5" />
+            <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
           </Button>
         )}
       </div>
-      <div className="flex gap-2 text-sm">
+
+      <div className="flex p-1 bg-secondary/30 rounded-lg">
         <button
           type="button"
           onClick={() => handleModeChange('keyword')}
-          className={`px-3 py-1.5 rounded transition-colors ${
-            searchMode === 'keyword'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary hover:bg-secondary/80'
-          }`}
+          className={`flex-1 px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${searchMode === 'keyword'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+            }`}
         >
-          Keyword search
+          Keyword
         </button>
         <button
           type="button"
           onClick={() => handleModeChange('semantic')}
-          className={`px-3 py-1.5 rounded transition-colors ${
-            searchMode === 'semantic'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary hover:bg-secondary/80'
-          }`}
+          className={`flex-1 px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${searchMode === 'semantic'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+            }`}
         >
-          AI Semantic Search
+          AI Semantic
         </button>
       </div>
     </div>

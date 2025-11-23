@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { NoteList } from '@/components/NoteList';
 import { Button } from '@/components/ui/button';
@@ -8,13 +8,42 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { QuoteWidget, NavWidget, WeekViewWidget, UniversityWidget } from '@/components/DashboardWidgets';
 
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useRouter } from 'next/navigation';
+
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchMode, setSearchMode] = useState<'keyword' | 'semantic'>('keyword');
+  const router = useRouter();
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ⌘+K or Ctrl+K for search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        // Focus the search input
+        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+
+      // ⌘+N or Ctrl+N for new note
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault();
+        router.push('/notes/new');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router]);
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden relative font-sans">
+    <div className="h-screen bg-background flex overflow-hidden relative font-sans transition-colors duration-300">
       {/* Left: Sidebar (fixed width) */}
       <div className="w-72 flex-shrink-0 border-r border-border/50 bg-sidebar/50 backdrop-blur-sm">
         <Sidebar
@@ -30,22 +59,32 @@ export default function Home() {
       {/* Center: Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative overflow-y-auto">
 
-        {/* Hero / Header Section */}
-        <div className="w-full h-48 bg-gradient-to-r from-pink-100 to-blue-100 dark:from-pink-950/30 dark:to-blue-950/30 relative">
-          <div className="absolute -bottom-12 left-8">
-            {/* Avatar or Icon */}
-            <div className="h-24 w-24 rounded-full bg-background border-4 border-background shadow-sm flex items-center justify-center text-4xl overflow-hidden">
-              <img src="https://api.dicebear.com/7.x/notionists/svg?seed=Felix" alt="Avatar" className="w-full h-full" />
+        {/* Clean Header Section */}
+        <div className="w-full border-b border-border/30 bg-gradient-to-b from-background to-muted/20">
+          <div className="max-w-6xl mx-auto px-8 py-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* App Icon/Logo */}
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-orange-500 flex items-center justify-center shadow-md">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+
+              {/* Title */}
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Noteshot</h1>
+                <p className="text-sm text-muted-foreground">Your personal knowledge base</p>
+              </div>
+            </div>
+
+            {/* Right Actions */}
+            <div className="ml-auto">
+              <ThemeToggle />
             </div>
           </div>
         </div>
 
-        <main className="flex-1 p-8 pt-16 max-w-6xl mx-auto w-full">
-
-          {/* Title */}
-          <div className="mb-10">
-            <h1 className="text-4xl font-bold font-serif mb-2">| h o m e <span className="text-muted-foreground font-normal text-2xl">- template!</span></h1>
-          </div>
+        <main className="flex-1 p-8 max-w-6xl mx-auto w-full">
 
           {/* Quote Widget */}
           <QuoteWidget />
