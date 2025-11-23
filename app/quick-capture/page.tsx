@@ -63,23 +63,22 @@ export default function QuickCapturePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-white">
-      <div className="w-full max-w-[500px] rounded-lg border border-gray-200 bg-white shadow-lg p-6">
+    <div className="h-screen flex items-center justify-center bg-background/95 backdrop-blur-sm">
+      <div className="w-full max-w-[550px] mx-6 rounded-xl bg-card/95 backdrop-blur-md shadow-xl border border-border/50 p-6">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your note..."
-          className="w-full bg-white border-none outline-none resize-none text-gray-900 placeholder:text-gray-400 text-base leading-relaxed focus:ring-0 focus:outline-none"
-          style={{ minHeight: '120px' }}
+          placeholder="Search"
+          className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground/40 text-base leading-relaxed focus:ring-0 focus:outline-none overflow-hidden"
+          rows={4}
           disabled={isSubmitting}
         />
-        <div className="mt-4 text-xs text-gray-500 text-center">
-          Press ⌘+Enter to save • ESC to close
+        <div className="mt-3 text-xs text-muted-foreground/50 text-center">
+          ⌘+Enter to save • ESC to close
         </div>
       </div>
     </div>
   );
 }
-
