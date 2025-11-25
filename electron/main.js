@@ -342,8 +342,8 @@ function createQuickCaptureWindow() {
   }
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const windowWidth = 500;
-  const windowHeight = 200;
+  const windowWidth = 400;
+  const windowHeight = 400;
   const x = Math.floor((width - windowWidth) / 2);
   const y = Math.floor((height - windowHeight) / 2);
 
@@ -353,12 +353,12 @@ function createQuickCaptureWindow() {
     x: x,
     y: y,
     frame: false,
-    transparent: false,
+    transparent: true,
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
     show: false,  // keep hidden until ready
-    backgroundColor: '#ffffff',
+    backgroundColor: '#00000000',
     icon: path.join(__dirname, 'icon.png'),
     title: 'Noteshot - Quick Capture',
     webPreferences: {
@@ -398,10 +398,10 @@ let isQuickCaptureOpening = false;
 // Quick Capture: Capture screenshot, create note, then open window
 async function openQuickCapture() {
   // Only work on Mac
-  if (process.platform !== 'darwin') {
-    safeLog('[main] Quick capture only available on Mac');
-    return;
-  }
+  // if (process.platform !== 'darwin') {
+  //   safeLog('[main] Quick capture only available on Mac');
+  //   return;
+  // }
 
   // prevent double-trigger if shortcut is pressed twice quickly
   if (isQuickCaptureOpening) {
@@ -465,20 +465,20 @@ app.whenReady().then(() => {
   safeLog('[main] Creating window...');
   createWindow();
 
-  // Register global shortcut for quick capture (Mac only)
-  if (process.platform === 'darwin') {
-    const shortcut = 'Control+Shift+Space';
-    const ret = globalShortcut.register(shortcut, () => {
-      safeLog('[main] Quick capture hotkey pressed');
-      openQuickCapture();
-    });
+  // Register global shortcut for quick capture (All platforms)
+  // if (process.platform === 'darwin') {
+  const shortcut = 'Control+Shift+Space';
+  const ret = globalShortcut.register(shortcut, () => {
+    safeLog('[main] Quick capture hotkey pressed');
+    openQuickCapture();
+  });
 
-    if (!ret) {
-      safeError('[main] Failed to register quick capture hotkey');
-    } else {
-      safeLog('[main] ✓ Quick capture hotkey registered: Control+Shift+Space');
-    }
+  if (!ret) {
+    safeError('[main] Failed to register quick capture hotkey');
+  } else {
+    safeLog('[main] ✓ Quick capture hotkey registered: Control+Shift+Space');
   }
+  // }
 
   // Unregister all shortcuts when app quits
   app.on('will-quit', () => {

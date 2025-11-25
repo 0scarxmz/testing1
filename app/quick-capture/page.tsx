@@ -79,19 +79,25 @@ export default function QuickCapturePage() {
   }
 
   return (
-    <div className="h-screen flex items-center justify-center bg-background/95 backdrop-blur-sm">
-      <div className="w-full max-w-[550px] mx-6 rounded-xl bg-card/95 backdrop-blur-md shadow-xl border border-border/50 p-6">
+    <div className="h-screen w-screen flex items-center justify-center bg-transparent">
+      <div
+        className="w-full h-full bg-[#feff9c] shadow-lg flex flex-col overflow-hidden relative rounded-sm"
+        style={{ WebkitAppRegion: 'drag' } as any}
+      >
+        {/* Drag handle / Header area */}
+        <div className="h-6 w-full cursor-move flex-shrink-0" />
+
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search"
-          className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground/40 text-base leading-relaxed focus:ring-0 focus:outline-none overflow-hidden"
-          rows={4}
+          placeholder="Quick note..."
+          className="flex-1 w-full bg-transparent border-none outline-none resize-none text-gray-800 placeholder:text-gray-500/60 text-lg leading-relaxed focus:ring-0 focus:outline-none p-4 pt-0"
+          style={{ WebkitAppRegion: 'no-drag' } as any}
           disabled={isSubmitting}
         />
-        <div className="mt-3 text-xs text-muted-foreground/50 text-center">
+        <div className="p-2 text-[10px] text-gray-500/60 text-center select-none pb-3">
           ⌘+Enter to save • ESC to close
         </div>
       </div>
