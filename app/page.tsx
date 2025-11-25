@@ -10,6 +10,7 @@ import { QuoteWidget, NavWidget, WeekViewWidget, UniversityWidget } from '@/comp
 
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useRouter } from 'next/navigation';
+import { AppLogo } from '@/components/AppLogo';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,8 +48,8 @@ export default function Home() {
       {/* Left: Sidebar (fixed width) */}
       <div className="w-72 flex-shrink-0 border-r border-border/50 bg-sidebar/50 backdrop-blur-sm">
         <Sidebar
+          onTagClick={(tag) => setActiveTag(tag || null)}
           onSearchChange={setSearchQuery}
-          onTagClick={setActiveTag}
           onModeChange={setSearchMode}
           searchQuery={searchQuery}
           activeTag={activeTag}
@@ -56,7 +57,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Center: Main Content Area */}
+      {/* Right: Main content area (flexible) */}
       <div className="flex-1 flex flex-col min-w-0 relative overflow-y-auto">
 
         {/* Clean Header Section */}
@@ -64,11 +65,7 @@ export default function Home() {
           <div className="max-w-6xl mx-auto px-8 py-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* App Icon/Logo */}
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-orange-500 flex items-center justify-center shadow-md">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
+              <AppLogo size="md" editable={true} />
 
               {/* Title */}
               <div>

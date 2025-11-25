@@ -50,6 +50,13 @@ try {
       saveCoverImage: (sourcePath, noteId) => ipcRenderer.invoke('cover-image:saveFile', sourcePath, noteId),
       deleteCoverImage: (imagePath) => ipcRenderer.invoke('cover-image:deleteFile', imagePath),
 
+      // App Logo operations
+      uploadAppLogo: () => ipcRenderer.invoke('app-logo:upload'),
+      getAppLogo: () => ipcRenderer.invoke('app-logo:get'),
+
+      // Note Icon operations
+      saveNoteIcon: (sourcePath, noteId) => ipcRenderer.invoke('note-icon:save', sourcePath, noteId),
+
       // General Image operations
       saveImage: (arrayBuffer, filename) => ipcRenderer.invoke('image:save', arrayBuffer, filename),
     });

@@ -815,7 +815,7 @@ ipcMain.handle('cover-image:selectFile', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [
-        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] },
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
         { name: 'All Files', extensions: ['*'] }
       ]
     });
@@ -883,6 +883,86 @@ ipcMain.handle('cover-image:deleteFile', async (_, imagePath) => {
   } catch (error) {
     safeError('[main] Cover image delete failed:', error);
     return false;
+  }
+});
+
+// App Logo handlers
+ipcMain.handle('app-logo:upload', async () => {
+  try {
+    // Select file
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return null;
+    }
+
+    const sourcePath = result.filePaths[0];
+    const ext = path.extname(sourcePath);
+    const destPath = path.join(app.getPath('userData'), `app-logo${ext}`);
+
+    // Copy file
+    fs.copyFileSync(sourcePath, destPath);
+    safeLog('[main] App logo saved to:', destPath);
+
+    return destPath;
+  } catch (error) {
+    safeError('[main] App logo upload failed:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('app-logo:get', async () => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const possibleExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+
+    for (const ext of possibleExtensions) {
+      const logoPath = path.join(userDataPath, `app-logo.${ext}`);
+      if (fs.existsSync(logoPath)) {
+        return logoPath;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    safeError('[main] App logo get failed:', error);
+    return null;
+  }
+});
+
+// Note Icon handler (reuses cover image infrastructure)
+ipcMain.handle('note-icon:save', async (_, sourcePath, noteId) => {
+  try {
+    if (!sourcePath || !noteId) {
+      safeError('[main] Note icon save: missing sourcePath or noteId');
+      return null;
+    }
+
+    const userDataPath = app.getPath('userData');
+    const noteIconsDir = path.join(userDataPath, 'note-icons');
+
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(noteIconsDir)) {
+      fs.mkdirSync(noteIconsDir, { recursive: true });
+    }
+
+    const ext = path.extname(sourcePath);
+    const destPath = path.join(noteIconsDir, `${noteId}${ext}`);
+
+    // Copy file
+    fs.copyFileSync(sourcePath, destPath);
+    safeLog('[main] Note icon saved to:', destPath);
+
+    return destPath;
+  } catch (error) {
+    safeError('[main] Note icon save failed:', error);
+    return null;
   }
 });
 

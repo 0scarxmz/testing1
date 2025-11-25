@@ -5,6 +5,7 @@ import { getAllTags } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { SidebarSearch } from './sidebar-search';
 import { X } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 
 type SearchMode = 'keyword' | 'semantic';
 
@@ -95,7 +96,7 @@ export function Sidebar({
     <div className="w-72 border-r border-border/40 bg-sidebar flex flex-col h-screen font-sans">
       <div className="p-4 pb-0">
         <div className="flex items-center gap-2 px-2 mb-4 opacity-80">
-          <div className="h-5 w-5 rounded bg-foreground text-background flex items-center justify-center text-[10px] font-bold">N</div>
+          <AppLogo size="sm" editable={false} />
           <span className="font-semibold text-sm">Noteshot</span>
         </div>
       </div>

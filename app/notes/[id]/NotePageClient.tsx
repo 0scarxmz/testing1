@@ -14,6 +14,8 @@ import { TagInput } from '@/components/tag-input';
 import { RelatedNotes } from '@/components/RelatedNotes';
 import { ScreenshotModal } from '@/components/ScreenshotModal';
 import { CoverImage } from '@/components/CoverImage';
+import { AppLogo } from '@/components/AppLogo';
+import { NoteIcon } from '@/components/NoteIcon';
 
 export function NotePageClient() {
   const params = useParams();
@@ -26,6 +28,8 @@ export function NotePageClient() {
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [coverImagePath, setCoverImagePath] = useState<string | null>(null);
+  const [iconPath, setIconPath] = useState<string | null>(null);
+  const [iconEmoji, setIconEmoji] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
@@ -40,6 +44,8 @@ export function NotePageClient() {
         setContent(loadedNote.content);
         setTags(loadedNote.tags);
         setCoverImagePath(loadedNote.coverImagePath || null);
+        setIconPath(loadedNote.iconPath || null);
+        setIconEmoji(loadedNote.iconEmoji || null);
       } else {
         router.push('/');
       }
@@ -199,13 +205,17 @@ export function NotePageClient() {
     <div className="min-h-screen bg-background font-sans">
       {/* Header / Navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40 transition-all duration-200">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href="/" className="hover:text-foreground transition-colors flex items-center gap-1">
-              <span className="opacity-50">/</span> Home
-            </Link>
-            <span className="opacity-30">/</span>
-            <span className="truncate max-w-[200px] font-medium text-foreground">{title || 'Untitled'}</span>
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+          {/* Logo and Breadcrumb */}
+          <div className="flex items-center gap-3">
+            <AppLogo size="sm" editable={true} />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Link href="/" className="hover:text-foreground transition-colors flex items-center gap-1">
+                <span className="opacity-50">/</span> Home
+              </Link>
+              <span className="opacity-30">/</span>
+              <span className="truncate max-w-[200px] font-medium text-foreground">{title || 'Untitled'}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -284,9 +294,37 @@ export function NotePageClient() {
 
           {/* Icon / Emoji */}
           <div className="-mt-12 mb-8 relative z-10 ml-2">
-            <div className="text-7xl drop-shadow-sm cursor-pointer hover:opacity-80 transition-opacity">
-              📝
-            </div>
+            <NoteIcon
+              noteId={isNew ? 'new' : id}
+              iconPath={iconPath}
+              iconEmoji={iconEmoji}
+              editable={isEditing}
+              onChange={async (data) => {
+                console.log('[NotePage] Icon onChange called with data:', data);
+
+                if (data.emoji !== undefined) {
+                  setIconEmoji(data.emoji);
+                  setIconPath(null);
+                }
+                if (data.path !== undefined) {
+                  setIconPath(data.path);
+                  setIconEmoji(null);
+                }
+
+                if (!isNew && note) {
+                  try {
+                    console.log('[NotePage] Updating note with icon data');
+                    await updateNote(id, {
+                      iconPath: data.path || undefined,
+                      iconEmoji: data.emoji || undefined
+                    });
+                    await loadNote();
+                  } catch (err) {
+                    console.error('[NotePage] Failed to update icon:', err);
+                  }
+                }
+              }}
+            />
           </div>
 
           {/* Title Input */}
