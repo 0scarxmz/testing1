@@ -79,26 +79,32 @@ export default function QuickCapturePage() {
   }
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-transparent">
+    <div className="h-screen w-screen flex items-center justify-center bg-transparent font-sans">
       <div
-        className="w-full h-full bg-[#feff9c] shadow-lg flex flex-col overflow-hidden relative rounded-sm"
-        style={{ WebkitAppRegion: 'drag' } as any}
+        className="w-full h-full bg-[#fdf6b2] shadow-2xl flex flex-col overflow-hidden relative rounded-sm border border-[#e8e2a2]"
+        style={{
+          WebkitAppRegion: 'drag',
+          backgroundImage: 'linear-gradient(to bottom right, #fff9c4, #fff59d)',
+        } as any}
       >
-        {/* Drag handle / Header area */}
-        <div className="h-6 w-full cursor-move flex-shrink-0" />
+        {/* Subtle top bar / Drag handle */}
+        <div className="h-5 w-full cursor-move flex-shrink-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
+          <div className="w-12 h-1 rounded-full bg-black/5 mt-1"></div>
+        </div>
 
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Quick note..."
-          className="flex-1 w-full bg-transparent border-none outline-none resize-none text-gray-800 placeholder:text-gray-500/60 text-lg leading-relaxed focus:ring-0 focus:outline-none p-4 pt-0"
+          placeholder="Jot something down..."
+          className="flex-1 w-full bg-transparent border-none outline-none resize-none text-[#37352f] placeholder:text-[#37352f]/40 text-lg leading-relaxed focus:ring-0 focus:outline-none p-5 pt-1 font-medium selection:bg-[#d4d09b]/30"
           style={{ WebkitAppRegion: 'no-drag' } as any}
           disabled={isSubmitting}
         />
-        <div className="p-2 text-[10px] text-gray-500/60 text-center select-none pb-3">
-          ⌘+Enter to save • ESC to close
+        <div className="px-4 py-2 flex justify-between items-center text-[10px] text-[#37352f]/40 select-none pb-3">
+          <span>Quick Note</span>
+          <span className="opacity-70">⌘+Enter to save</span>
         </div>
       </div>
     </div>

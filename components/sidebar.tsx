@@ -29,7 +29,7 @@ export function Sidebar({
   const [tags, setTags] = useState<string[]>([]);
   const [internalActiveTag, setInternalActiveTag] = useState<string | null>(null);
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
-  const [internalSearchMode, setInternalSearchMode] = useState<SearchMode>('keyword');
+  const [internalSearchMode, setInternalSearchMode] = useState<SearchMode>('semantic');
 
   // Use external props if provided, otherwise use internal state
   const activeTag = externalActiveTag !== undefined ? externalActiveTag : internalActiveTag;
@@ -93,11 +93,13 @@ export function Sidebar({
   }
 
   return (
-    <div className="w-72 border-r border-border/40 bg-sidebar flex flex-col h-screen font-sans">
-      <div className="p-4 pb-0">
-        <div className="flex items-center gap-2 px-2 mb-4 opacity-80">
-          <AppLogo size="sm" editable={false} />
-          <span className="font-semibold text-sm">Noteshot</span>
+    <div className="w-60 border-r border-border/30 bg-[#F7F7F5] dark:bg-[#252525] flex flex-col h-screen font-sans transition-colors duration-300">
+      <div className="p-3 pb-0">
+        <div className="flex items-center gap-2 px-2 mb-2 opacity-90 hover:opacity-100 transition-opacity cursor-default">
+          <div className="scale-90 origin-left">
+            <AppLogo size="sm" editable={false} />
+          </div>
+          <span className="font-medium text-sm text-foreground/90">Noteshot</span>
         </div>
       </div>
 
@@ -107,37 +109,37 @@ export function Sidebar({
         searchMode={searchMode}
       />
 
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto py-1 scrollbar-hide">
         {tags.length > 0 && (
-          <div className="px-3">
-            <div className="flex items-center justify-between px-2 mb-2 mt-4">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tags</h2>
+          <div className="px-2">
+            <div className="flex items-center justify-between px-2 mb-1 mt-3 group">
+              <h2 className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">Tags</h2>
               {activeTag && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleClearFilter}
-                  className="h-5 text-[10px] px-1.5 hover:bg-destructive/10 hover:text-destructive"
+                  className="h-4 text-[10px] px-1 hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <X className="h-3 w-3 mr-1" />
+                  <X className="h-2.5 w-2.5 mr-1" />
                   Clear
                 </Button>
               )}
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-[1px]">
               {tags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => handleTagClick(tag)}
                   className={`
-                    w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2 group
+                    w-full text-left text-xs px-2 py-1 rounded-sm transition-all duration-150 flex items-center gap-2 group
                     ${activeTag === tag
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                      ? 'bg-black/5 dark:bg-white/10 text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground'
                     }
                   `}
                 >
-                  <span className="opacity-50 text-xs">#</span>
+                  <span className="opacity-40 text-[10px]">#</span>
                   {tag}
                 </button>
               ))}
@@ -146,9 +148,13 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-border/40 text-[10px] text-muted-foreground text-center">
-        ⌘+K to search • ⌘+N for new note
-      </div>
+      {/* User / Settings / Updates area placeholder to match Notion's bottom bar if desired, or just footer */}
+      {/* <div className="p-3 border-t border-border/30">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+             <Settings className="h-3.5 w-3.5" />
+             <span className="text-xs">Settings</span>
+          </div>
+      </div> */}
     </div>
   );
 }
