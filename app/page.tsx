@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Sidebar } from '@/components/sidebar';
+import { NotionSidebar } from '@/components/NotionSidebar';
 import { NoteList } from '@/components/NoteList';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -47,14 +47,7 @@ export default function Home() {
     <div className="h-screen bg-background flex overflow-hidden relative font-sans transition-colors duration-300">
       {/* Left: Sidebar (fixed width) */}
       <div className="w-72 flex-shrink-0 border-r border-border/50 bg-sidebar/50 backdrop-blur-sm">
-        <Sidebar
-          onTagClick={(tag) => setActiveTag(tag || null)}
-          onSearchChange={setSearchQuery}
-          onModeChange={setSearchMode}
-          searchQuery={searchQuery}
-          activeTag={activeTag}
-          searchMode={searchMode}
-        />
+        <NotionSidebar />
       </div>
 
       {/* Right: Main content area (flexible) */}
