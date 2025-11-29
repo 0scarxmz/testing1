@@ -7,7 +7,7 @@ import type { Note } from '@/types/note';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Cloud, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { extractTags } from '@/lib/tags';
 import { TagInput } from '@/components/tag-input';
@@ -31,9 +31,8 @@ export function NotePageClient() {
   const [iconPath, setIconPath] = useState<string | null>(null);
   const [iconEmoji, setIconEmoji] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
 
   const loadNote = useCallback(async () => {
     try {
@@ -67,29 +66,11 @@ export function NotePageClient() {
       setLoading(false);
     } else {
       loadNote();
-
-      // Poll for updates every 3 seconds to catch screenshot and AI-generated content
-      const interval = setInterval(() => {
-        loadNote();
-      }, 3000);
-
-      return () => clearInterval(interval);
     }
   }, [id, isNew, loadNote]);
 
-  // Auto-enable edit mode for new notes
-  useEffect(() => {
-    if (isNew) {
-      setIsEditing(true);
-    } else {
-      setIsEditing(false); // Ensure edit mode is off for existing notes
-    }
-  }, [isNew]);
-
-  async function handleSave() {
-    if (saving) return;
-
-    setSaving(true);
+  const saveNote = useCallback(async () => {
+    setSaveStatus('saving');
     try {
       // Use manual tags, but also merge with auto-extracted tags
       const extractedTags = extractTags(content);
@@ -156,18 +137,32 @@ export function NotePageClient() {
           tags: allTags,
           embedding,
           coverImagePath: coverImageUpdate,
+          iconPath: iconPath || undefined,
+          iconEmoji: iconEmoji || undefined
         });
-        // Explicitly reload note to refresh state from database
-        await loadNote();
-        router.refresh();
+        setSaveStatus('saved');
       }
     } catch (error) {
       console.error('Failed to save note:', error);
-      alert('Failed to save note. Please try again.');
-    } finally {
-      setSaving(false);
+      setSaveStatus('error');
     }
-  }
+  }, [content, coverImagePath, iconEmoji, iconPath, id, isNew, note, router, tags, title]);
+
+  // Auto-save effect
+  useEffect(() => {
+    if (loading) return;
+
+    // Don't auto-save if nothing changed (optional optimization, but hard to track "changed" without refs)
+    // For now, we rely on the fact that this effect only runs when deps change.
+
+    setSaveStatus('unsaved');
+
+    const timer = setTimeout(() => {
+      saveNote();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [title, content, tags, coverImagePath, iconPath, iconEmoji, saveNote, loading]);
 
   async function handleDelete() {
     if (!note || !confirm('Are you sure you want to delete this note?')) return;
@@ -219,25 +214,30 @@ export function NotePageClient() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-2 text-xs text-muted-foreground">
+              {saveStatus === 'saving' && (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              )}
+              {saveStatus === 'saved' && (
+                <>
+                  <Cloud className="h-3 w-3" />
+                  <span>Saved</span>
+                </>
+              )}
+              {saveStatus === 'unsaved' && (
+                <span className="opacity-50">Unsaved changes...</span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="text-destructive">Error saving</span>
+              )}
+            </div>
+
             {!isNew && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsEditing(!isEditing)}
-                className={isEditing ? "text-primary" : "text-muted-foreground"}
-              >
-                {isEditing ? 'Done' : 'Edit'}
-              </Button>
-            )}
-            {!isNew && isEditing && (
               <Button variant="ghost" size="sm" onClick={handleDelete} className="text-muted-foreground hover:text-destructive">
                 <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-            {isEditing && (
-              <Button size="sm" onClick={handleSave} disabled={saving} className={saving ? 'opacity-70' : ''}>
-                <Save className="mr-2 h-4 w-4" />
-                {saving ? 'Saving...' : 'Save'}
               </Button>
             )}
           </div>
@@ -249,36 +249,9 @@ export function NotePageClient() {
         <div className="group relative w-full h-[30vh] min-h-[200px] bg-secondary/30 border-b border-border/50">
           <CoverImage
             coverImagePath={coverImagePath}
-            editable={isEditing}
+            editable={true}
             onChange={async (path) => {
-              console.log('[NotePage] Cover image onChange called with path:', path);
-              console.log('[NotePage] isNew:', isNew, 'note:', note?.id);
-
               setCoverImagePath(path);
-
-              if (!isNew && note && path) {
-                try {
-                  console.log('[NotePage] Updating note with coverImagePath:', path);
-                  const result = await updateNote(id, { coverImagePath: path });
-                  console.log('[NotePage] Update result:', result);
-
-                  console.log('[NotePage] Reloading note...');
-                  await loadNote();
-                  console.log('[NotePage] Note reloaded, new coverImagePath:', coverImagePath);
-                } catch (err) {
-                  console.error('[NotePage] Failed to auto-save cover image:', err);
-                }
-              } else if (!isNew && note && !path) {
-                try {
-                  console.log('[NotePage] Removing cover image');
-                  await updateNote(id, { coverImagePath: undefined });
-                  await loadNote();
-                } catch (err) {
-                  console.error('[NotePage] Failed to remove cover image:', err);
-                }
-              } else {
-                console.log('[NotePage] Skipping database update - isNew or no note');
-              }
             }}
             noteId={isNew ? 'new' : id}
           />
@@ -298,10 +271,8 @@ export function NotePageClient() {
               noteId={isNew ? 'new' : id}
               iconPath={iconPath}
               iconEmoji={iconEmoji}
-              editable={isEditing}
+              editable={true}
               onChange={async (data) => {
-                console.log('[NotePage] Icon onChange called with data:', data);
-
                 if (data.emoji !== undefined) {
                   setIconEmoji(data.emoji);
                   setIconPath(null);
@@ -310,35 +281,18 @@ export function NotePageClient() {
                   setIconPath(data.path);
                   setIconEmoji(null);
                 }
-
-                if (!isNew && note) {
-                  try {
-                    console.log('[NotePage] Updating note with icon data');
-                    await updateNote(id, {
-                      iconPath: data.path || undefined,
-                      iconEmoji: data.emoji || undefined
-                    });
-                    await loadNote();
-                  } catch (err) {
-                    console.error('[NotePage] Failed to update icon:', err);
-                  }
-                }
               }}
             />
           </div>
 
           {/* Title Input */}
           <div className="mb-6 group">
-            {isEditing ? (
-              <Input
-                placeholder="Untitled"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-5xl font-bold font-serif border-0 focus-visible:ring-0 shadow-none bg-transparent p-0 h-auto placeholder:text-muted-foreground/40"
-              />
-            ) : (
-              <h1 className="text-5xl font-bold font-serif py-2">{title || 'Untitled'}</h1>
-            )}
+            <Input
+              placeholder="Untitled"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="text-5xl font-bold font-serif border-0 focus-visible:ring-0 shadow-none bg-transparent p-0 h-auto placeholder:text-muted-foreground/40"
+            />
           </div>
 
           {/* Metadata / Tags */}
@@ -347,24 +301,16 @@ export function NotePageClient() {
               <span className="opacity-60">Tags</span>
             </div>
             <div className="flex-1">
-              {isEditing ? (
-                <TagInput tags={tags} onChange={setTags} placeholder="Empty" />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {tags.length > 0 ? tags.map(tag => (
-                    <span key={tag} className="bg-secondary px-2 py-1 rounded-md text-xs">#{tag}</span>
-                  )) : <span className="opacity-50 italic">No tags</span>}
-                </div>
-              )}
+              <TagInput tags={tags} onChange={setTags} placeholder="Empty" />
             </div>
           </div>
 
           {/* Editor */}
-          <div className={`min-h-[400px] ${!isEditing ? 'pointer-events-none' : ''}`}>
+          <div className="min-h-[400px]">
             <MarkdownEditor
               content={content}
               onChange={setContent}
-              editable={isEditing}
+              editable={true}
             />
           </div>
 
