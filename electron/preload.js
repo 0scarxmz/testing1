@@ -59,6 +59,10 @@ try {
 
       // General Image operations
       saveImage: (arrayBuffer, filename) => ipcRenderer.invoke('image:save', arrayBuffer, filename),
+
+      // Settings operations
+      getSettings: (key) => ipcRenderer.invoke('settings:get', key),
+      updateSettings: (key, value) => ipcRenderer.invoke('settings:set', key, value),
     });
 
     console.log('[preload] desktopAPI exposed successfully');

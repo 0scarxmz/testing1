@@ -29,9 +29,11 @@ import { Note } from '@/types/note';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AppLogo } from './AppLogo';
+import { SettingsModal } from './SettingsModal';
 
 export function NotionSidebar() {
     const [notes, setNotes] = useState<Note[]>([]);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -116,7 +118,10 @@ export function NotionSidebar() {
                     <span className="truncate">Search</span>
                     <span className="ml-auto text-xs opacity-60 border border-muted-foreground/30 px-1 rounded">⌘K</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 text-sm text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-sm cursor-pointer transition-colors">
+                <div
+                    className="flex items-center gap-2 px-3 py-1 text-sm text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-sm cursor-pointer transition-colors"
+                    onClick={() => setIsSettingsOpen(true)}
+                >
                     <Settings className="w-4 h-4" />
                     <span className="truncate">Settings</span>
                 </div>
@@ -289,6 +294,11 @@ export function NotionSidebar() {
                     <span className="text-sm">New Page</span>
                 </div>
             </div>
+
+            <SettingsModal
+                open={isSettingsOpen}
+                onOpenChange={setIsSettingsOpen}
+            />
         </div>
     );
 }

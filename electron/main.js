@@ -143,6 +143,7 @@ const { cosineSimilarity } = require('./ai/vector');
 const { generateNoteTitle } = require('./ai/title-generator');
 const { generateNoteTags } = require('./ai/tag-generator');
 const { captureScreenshot } = require('./screenshot');
+const settingsManager = require('./settings');
 
 // Store references to windows
 let mainWindow = null;
@@ -417,10 +418,17 @@ async function openQuickCapture() {
     const { randomUUID } = require('crypto');
     const noteId = randomUUID();
 
-    // Step 2: Capture screenshot with note ID
-    const screenshotPath = await captureScreenshot(noteId);
-    if (!screenshotPath) {
-      safeLog('[main] Screenshot capture failed, continuing without screenshot');
+    // Step 2: Capture screenshot with note ID (if enabled)
+    const autoScreenshot = settingsManager.get('autoScreenshot');
+    let screenshotPath = null;
+
+    if (autoScreenshot) {
+      screenshotPath = await captureScreenshot(noteId);
+      if (!screenshotPath) {
+        safeLog('[main] Screenshot capture failed, continuing without screenshot');
+      }
+    } else {
+      safeLog('[main] Auto-screenshot disabled, skipping capture');
     }
 
     // Step 3: Create note with screenshot
@@ -595,6 +603,16 @@ ipcMain.handle('screenshot:capture', async (_, noteId) => {
   }
 });
 
+
+// Settings IPC handlers
+ipcMain.handle('settings:get', async (_, key) => {
+  if (key) return settingsManager.get(key);
+  return settingsManager.getAll();
+});
+
+ipcMain.handle('settings:set', async (_, key, value) => {
+  return settingsManager.set(key, value);
+});
 
 // Quick Capture IPC handlers
 ipcMain.handle('quick-capture:updateNote', async (_, content) => {
