@@ -1,22 +1,58 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { NotionSidebar } from '@/components/NotionSidebar';
 import { NoteList } from '@/components/NoteList';
+import { KanbanBoard } from '@/components/KanbanBoard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, LayoutGrid, List } from 'lucide-react';
 import { QuoteWidget, NavWidget, WeekViewWidget, UniversityWidget } from '@/components/DashboardWidgets';
 
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useRouter } from 'next/navigation';
 import { AppLogo } from '@/components/AppLogo';
+import { Note } from '@/types/note';
+import * as storage from '@/lib/storage-sqlite';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchMode, setSearchMode] = useState<'keyword' | 'semantic'>('keyword');
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  // Fetch notes for Kanban board
+  const fetchNotes = useCallback(async () => {
+    try {
+      const allNotes = await storage.getAllNotes();
+      setNotes(allNotes);
+    } catch (error) {
+      console.error('Failed to fetch notes:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  // Handle note update from Kanban board
+  const handleUpdateNote = useCallback(async (id: string, updates: Partial<Note>) => {
+    try {
+      await storage.updateNote(id, updates);
+      // Update local state optimistically
+      setNotes((prev) =>
+        prev.map((note) => (note.id === id ? { ...note, ...updates } : note))
+      );
+    } catch (error) {
+      console.error('Failed to update note:', error);
+      throw error;
+    }
+  }, []);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -68,7 +104,30 @@ export default function Home() {
             </div>
 
             {/* Right Actions */}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {/* View Toggle */}
+              <div className="flex items-center bg-secondary/50 rounded-lg p-1 border border-border">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition-colors ${viewMode === 'list'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  title="List View"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('board')}
+                  className={`p-2 rounded-md transition-colors ${viewMode === 'board'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  title="Board View"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+              </div>
               <ThemeToggle />
             </div>
           </div>
@@ -76,40 +135,61 @@ export default function Home() {
 
         <main className="flex-1 p-8 max-w-6xl mx-auto w-full">
 
-          {/* Quote Widget */}
-          <QuoteWidget />
+          {/* Quote Widget - only show in list view */}
+          {viewMode === 'list' && <QuoteWidget />}
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-            {/* Left Column: Widgets */}
-            <div className="md:col-span-4 space-y-6">
-              <NavWidget />
-              <WeekViewWidget />
-              <UniversityWidget />
+          {viewMode === 'list' ? (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+              {/* Left Column: Widgets */}
+              <div className="md:col-span-4 space-y-6">
+                <NavWidget />
+                <WeekViewWidget />
+                <UniversityWidget />
 
-              <div className="bg-secondary/30 p-4 rounded-xl border border-border flex flex-col items-center justify-center text-center min-h-[150px]">
-                <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbW54eW54eW54eW54eW54eW54eW54eW54eW54eW54eW54eSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l4KibWpBGWchSqCRy/giphy.gif" alt="Plant" className="w-24 h-24 opacity-80 mix-blend-multiply dark:mix-blend-normal" />
-                <p className="text-xs text-muted-foreground mt-2 font-serif italic">keep growing</p>
-              </div>
-            </div>
-
-            {/* Right Column: Notes */}
-            <div className="md:col-span-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold font-serif border-b-2 border-primary/20 pb-1 pr-4">
-                  {activeTag ? `#${activeTag}` : 'Recent Notes'}
-                </h2>
-                <div className="text-xs text-muted-foreground font-mono">
-                  {searchQuery ? `Searching: "${searchQuery}"` : 'All Tasks'}
+                <div className="bg-secondary/30 p-4 rounded-xl border border-border flex flex-col items-center justify-center text-center min-h-[150px]">
+                  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbW54eW54eW54eW54eW54eW54eW54eW54eW54eW54eW54eSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l4KibWpBGWchSqCRy/giphy.gif" alt="Plant" className="w-24 h-24 opacity-80 mix-blend-multiply dark:mix-blend-normal" />
+                  <p className="text-xs text-muted-foreground mt-2 font-serif italic">keep growing</p>
                 </div>
               </div>
 
-              <NoteList
-                searchQuery={searchQuery}
-                activeTag={activeTag}
-                searchMode={searchMode}
-              />
+              {/* Right Column: Notes */}
+              <div className="md:col-span-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold font-serif border-b-2 border-primary/20 pb-1 pr-4">
+                    {activeTag ? `#${activeTag}` : 'Recent Notes'}
+                  </h2>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    {searchQuery ? `Searching: "${searchQuery}"` : 'All Tasks'}
+                  </div>
+                </div>
+
+                <NoteList
+                  searchQuery={searchQuery}
+                  activeTag={activeTag}
+                  searchMode={searchMode}
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Kanban Board View */
+            <div className="-mx-8 -mt-4">
+              <div className="flex items-center justify-between px-8 mb-4">
+                <h2 className="text-xl font-bold font-serif border-b-2 border-primary/20 pb-1 pr-4">
+                  📋 Task Board
+                </h2>
+                <div className="text-xs text-muted-foreground font-mono">
+                  {notes.length} notes • Drag to change status
+                </div>
+              </div>
+              {isLoading ? (
+                <div className="flex items-center justify-center h-96">
+                  <p className="text-muted-foreground">Loading board...</p>
+                </div>
+              ) : (
+                <KanbanBoard notes={notes} onUpdateNote={handleUpdateNote} />
+              )}
+            </div>
+          )}
         </main>
       </div>
 
