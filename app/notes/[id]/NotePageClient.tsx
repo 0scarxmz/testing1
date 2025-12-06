@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getNote, updateNote, deleteNote } from '@/lib/storage';
+import { getNote, updateNote, deleteNote, createNote } from '@/lib/storage';
 import type { Note } from '@/types/note';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Button } from '@/components/ui/button';
@@ -311,6 +311,20 @@ export function NotePageClient() {
               content={content}
               onChange={setContent}
               editable={true}
+              onCreatePage={async () => {
+                try {
+                  const newNote = await createNote({
+                    title: 'Untitled',
+                    content: '',
+                    tags: [],
+                    embedding: null,
+                  });
+                  return newNote.id;
+                } catch (error) {
+                  console.error('Failed to create page:', error);
+                  return null;
+                }
+              }}
             />
           </div>
 

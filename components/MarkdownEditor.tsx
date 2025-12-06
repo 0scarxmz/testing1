@@ -4,17 +4,19 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { htmlToMarkdown, contentToHtml, normalizeToMarkdown } from '@/lib/markdown';
+import { SlashCommand } from './editor/SlashCommand';
 
 interface MarkdownEditorProps {
   content: string; // Can be Markdown or HTML (for backward compatibility)
   onChange: (content: string) => void; // Always receives Markdown format
   placeholder?: string;
   editable?: boolean;
+  onCreatePage?: () => Promise<string | null>; // For /page command
 }
 
-export function MarkdownEditor({ content, onChange, placeholder = 'Start writing...', editable = true }: MarkdownEditorProps) {
+export function MarkdownEditor({ content, onChange, placeholder = 'Start writing...', editable = true, onCreatePage }: MarkdownEditorProps) {
   // Normalize content to Markdown (convert HTML if needed)
   const markdownContent = normalizeToMarkdown(content);
 
@@ -27,6 +29,9 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
       Image.configure({
         inline: true,
         allowBase64: true,
+      }),
+      SlashCommand.configure({
+        onCreatePage,
       }),
     ],
     content: markdownContent ? contentToHtml(markdownContent) : '',
