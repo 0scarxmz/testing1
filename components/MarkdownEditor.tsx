@@ -7,6 +7,7 @@ import Image from '@tiptap/extension-image';
 import { useEffect, useCallback } from 'react';
 import { htmlToMarkdown, contentToHtml, normalizeToMarkdown } from '@/lib/markdown';
 import { SlashCommand } from './editor/SlashCommand';
+import { PageBlock } from './editor/PageBlock';
 
 interface MarkdownEditorProps {
   content: string; // Can be Markdown or HTML (for backward compatibility)
@@ -33,6 +34,7 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
       SlashCommand.configure({
         onCreatePage,
       }),
+      PageBlock,
     ],
     content: markdownContent ? contentToHtml(markdownContent) : '',
     editable: editable,
