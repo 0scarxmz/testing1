@@ -4,6 +4,7 @@ export const notes = sqliteTable("notes", {
   id: text("id").primaryKey(),
   title: text("title"),
   content: text("content"),
+  parentId: text("parent_id"), // ID of parent note for nested pages (null for root-level notes)
   tags: text("tags"), // store JSON string: ["tag1","tag2"]
   createdAt: integer("created_at"),
   updatedAt: integer("updated_at"),

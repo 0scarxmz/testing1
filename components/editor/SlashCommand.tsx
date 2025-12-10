@@ -93,10 +93,20 @@ const getSuggestionItems = ({ query, onCreatePage }: { query: string; onCreatePa
         },
         {
             title: 'Page',
-            description: 'Create a nested page block',
+            description: 'Create a nested page',
             icon: FileText,
-            command: ({ editor, range }) => {
-                editor.chain().focus().deleteRange(range).insertPageBlock().run();
+            command: async ({ editor, range }) => {
+                // Delete the slash command text first
+                editor.chain().focus().deleteRange(range).run();
+
+                // Create the nested page via callback
+                if (onCreatePage) {
+                    const newPageId = await onCreatePage();
+                    if (newPageId) {
+                        // Insert a page block linking to the new note
+                        editor.chain().focus().insertPageBlock(newPageId, 'Untitled').run();
+                    }
+                }
             },
         },
     ];

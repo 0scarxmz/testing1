@@ -2,6 +2,7 @@ export interface Note {
   id: string;
   title: string;
   content: string;
+  parentId?: string | null; // Parent note ID for nested pages (null for root-level notes)
   tags: string[];
   createdAt: number;
   updatedAt: number;

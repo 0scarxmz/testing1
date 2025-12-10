@@ -12,9 +12,9 @@ declare module '@tiptap/core' {
     interface Commands<ReturnType> {
         pageBlock: {
             /**
-             * Insert a page block
+             * Insert a page block linking to a note
              */
-            insertPageBlock: () => ReturnType;
+            insertPageBlock: (pageId: string, title?: string) => ReturnType;
         };
     }
 }
@@ -24,9 +24,7 @@ export const PageBlock = Node.create<PageBlockOptions>({
 
     group: 'block',
 
-    content: 'block+',
-
-    defining: true,
+    atom: true, // Atomic node - no editable content inside
 
     addOptions() {
         return {
@@ -36,11 +34,11 @@ export const PageBlock = Node.create<PageBlockOptions>({
 
     addAttributes() {
         return {
+            pageId: {
+                default: null, // ID of the linked note
+            },
             title: {
                 default: 'Untitled',
-            },
-            isOpen: {
-                default: true,
             },
         };
     },
@@ -64,16 +62,11 @@ export const PageBlock = Node.create<PageBlockOptions>({
     addCommands() {
         return {
             insertPageBlock:
-                () =>
+                (pageId: string, title?: string) =>
                     ({ commands }) => {
                         return commands.insertContent({
                             type: this.name,
-                            attrs: { title: 'Untitled', isOpen: true },
-                            content: [
-                                {
-                                    type: 'paragraph',
-                                },
-                            ],
+                            attrs: { pageId, title: title || 'Untitled' },
                         });
                     },
         };

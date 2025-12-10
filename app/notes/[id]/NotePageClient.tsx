@@ -313,15 +313,18 @@ export function NotePageClient() {
               editable={true}
               onCreatePage={async () => {
                 try {
+                  // Create a nested page with parentId set to current note
+                  const parentId = isNew ? undefined : id;
                   const newNote = await createNote({
                     title: 'Untitled',
                     content: '',
                     tags: [],
                     embedding: null,
+                    parentId: parentId, // Link to parent note
                   });
                   return newNote.id;
                 } catch (error) {
-                  console.error('Failed to create page:', error);
+                  console.error('Failed to create nested page:', error);
                   return null;
                 }
               }}

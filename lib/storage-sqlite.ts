@@ -50,6 +50,7 @@ function sqliteToNote(sqliteNote: any): Note {
     id: sqliteNote.id,
     title: sqliteNote.title || '',
     content: sqliteNote.content || '',
+    parentId: sqliteNote.parentId || sqliteNote.parent_id || null,
     tags,
     createdAt: sqliteNote.createdAt ?? sqliteNote.created_at ?? Date.now(),
     updatedAt: sqliteNote.updatedAt ?? sqliteNote.updated_at ?? Date.now(),
@@ -96,6 +97,7 @@ function noteToSqlite(note: Partial<Note>): any {
     id: note.id,
     title: note.title || '',
     content: note.content || '',
+    parentId: note.parentId || null,
     tags: JSON.stringify(tagsArray),
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
@@ -295,6 +297,7 @@ export async function updateNote(id: string, updates: Partial<Omit<Note, 'id' | 
   await desktopAPI.updateNote(id, {
     title: sqliteNote.title,
     content: sqliteNote.content,
+    parentId: sqliteNote.parentId,
     tags: sqliteNote.tags,
     updatedAt: sqliteNote.updatedAt,
     embedding: sqliteNote.embedding,
@@ -498,3 +501,19 @@ export async function getRelatedNotes(noteId: string, limit: number = 3): Promis
   }
 }
 
+/**
+ * Get child notes for a given parent note
+ */
+export async function getChildNotes(parentId: string): Promise<Note[]> {
+  if (!isElectron()) {
+    throw new Error('SQLite storage only available in Electron');
+  }
+
+  const desktopAPI = window.desktopAPI;
+  if (!desktopAPI) {
+    throw new Error('desktopAPI is not available');
+  }
+
+  const sqliteNotes = await desktopAPI.getChildNotes(parentId);
+  return sqliteNotes.map(sqliteToNote);
+}

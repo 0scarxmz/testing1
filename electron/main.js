@@ -551,6 +551,10 @@ ipcMain.handle('db:getAllTags', async () => {
   return await db.getAllTags();
 });
 
+ipcMain.handle('db:getChildNotes', async (_, parentId) => {
+  return await db.getChildNotes(parentId);
+});
+
 // Embedding operations
 ipcMain.handle('embeddings:generate', async (_, text) => {
   try {

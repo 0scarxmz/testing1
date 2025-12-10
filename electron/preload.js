@@ -27,6 +27,7 @@ try {
       deleteNote: (id) => ipcRenderer.invoke('db:deleteNote', id),
       getNotesByTag: (tag) => ipcRenderer.invoke('db:getNotesByTag', tag),
       searchNotesByText: (query) => ipcRenderer.invoke('db:searchNotesByText', query),
+      getChildNotes: (parentId) => ipcRenderer.invoke('db:getChildNotes', parentId),
       getAllTags: () => ipcRenderer.invoke('db:getAllTags'),
 
       // Embedding operations

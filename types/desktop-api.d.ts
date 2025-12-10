@@ -10,6 +10,7 @@ export interface DesktopAPI {
     id: string;
     title: string;
     content: string;
+    parentId?: string | null; // Parent note ID for nested pages
     tags: string; // JSON string
     createdAt: number;
     updatedAt: number;
@@ -27,6 +28,7 @@ export interface DesktopAPI {
   updateNote: (id: string, updates: {
     title?: string;
     content?: string;
+    parentId?: string | null; // Parent note ID for nested pages
     tags?: string;
     updatedAt?: number;
     embedding?: string | null;
@@ -44,6 +46,7 @@ export interface DesktopAPI {
   deleteNote: (id: string) => Promise<void>;
   getNotesByTag: (tag: string) => Promise<any[]>;
   searchNotesByText: (query: string) => Promise<any[]>;
+  getChildNotes: (parentId: string) => Promise<any[]>; // Get child notes for a parent
   getAllTags: () => Promise<string[]>;
   // Embedding operations
   generateEmbedding: (text: string) => Promise<number[]>;

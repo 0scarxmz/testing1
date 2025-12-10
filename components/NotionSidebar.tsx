@@ -31,9 +31,132 @@ import { usePathname, useRouter } from 'next/navigation';
 import { AppLogo } from './AppLogo';
 import { SettingsModal } from './SettingsModal';
 
+// Reusable NoteItem component with support for nested children
+interface NoteItemProps {
+    note: Note;
+    level: number;
+    pathname: string;
+    expandedNotes: Set<string>;
+    hasChildren: (noteId: string) => boolean;
+    getChildNotes: (parentId: string) => Note[];
+    toggleExpanded: (e: React.MouseEvent, noteId: string) => void;
+    handleNoteClick: (noteId: string) => void;
+    toggleFavorite: (e: React.MouseEvent, note: Note) => void;
+    handleDelete: (e: React.MouseEvent, noteId: string) => void;
+}
+
+function NoteItemWithChildren({
+    note,
+    level,
+    pathname,
+    expandedNotes,
+    hasChildren,
+    getChildNotes,
+    toggleExpanded,
+    handleNoteClick,
+    toggleFavorite,
+    handleDelete,
+}: NoteItemProps) {
+    const isActive = pathname === `/notes/${note.id}`;
+    const hasChildNotes = hasChildren(note.id);
+    const isExpanded = expandedNotes.has(note.id);
+    const childNotes = isExpanded ? getChildNotes(note.id) : [];
+
+    // Calculate indent based on nesting level (each level adds 16px)
+    const indent = level * 16;
+
+    return (
+        <>
+            <div
+                onClick={() => handleNoteClick(note.id)}
+                className={cn(
+                    "group flex items-center gap-2 px-3 py-1 min-h-[28px] text-sm cursor-pointer rounded-sm transition-colors",
+                    isActive
+                        ? "bg-black/5 dark:bg-white/10 text-foreground font-medium"
+                        : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+                )}
+                style={{ paddingLeft: `${12 + indent}px` }}
+            >
+                {/* Expand/Collapse chevron */}
+                <div
+                    className="flex items-center justify-center w-4 h-4 shrink-0"
+                    onClick={(e) => hasChildNotes && toggleExpanded(e, note.id)}
+                >
+                    {hasChildNotes ? (
+                        <ChevronRight
+                            className={cn(
+                                "w-3 h-3 transition-transform cursor-pointer hover:text-foreground",
+                                isExpanded ? "rotate-90" : "rotate-0"
+                            )}
+                        />
+                    ) : (
+                        <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-30 transition-opacity" />
+                    )}
+                </div>
+
+                {/* Note icon */}
+                <div className="flex items-center justify-center w-4 h-4 shrink-0 text-foreground/80">
+                    {note.iconEmoji ? (
+                        <span className="text-xs">{note.iconEmoji}</span>
+                    ) : (
+                        <FileText className="w-4 h-4" />
+                    )}
+                </div>
+
+                {/* Title */}
+                <span className="truncate flex-1">{note.title || 'Untitled'}</span>
+
+                {/* Dropdown menu */}
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <div className="h-5 w-5 flex items-center justify-center rounded-sm hover:bg-black/10 dark:hover:bg-white/10">
+                                <MoreHorizontal className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                            </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-48">
+                            <DropdownMenuItem onClick={(e) => toggleFavorite(e, note)}>
+                                <Star className={cn("mr-2 h-4 w-4", note.isFavorite && "fill-yellow-400 text-yellow-400")} />
+                                <span>{note.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={(e) => handleDelete(e, note.id)} className="text-red-600 focus:text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
+
+            {/* Render child notes recursively when expanded */}
+            {isExpanded && childNotes.length > 0 && (
+                <div className="space-y-[1px]">
+                    {childNotes.map((childNote) => (
+                        <NoteItemWithChildren
+                            key={childNote.id}
+                            note={childNote}
+                            level={level + 1}
+                            pathname={pathname}
+                            expandedNotes={expandedNotes}
+                            hasChildren={hasChildren}
+                            getChildNotes={getChildNotes}
+                            toggleExpanded={toggleExpanded}
+                            handleNoteClick={handleNoteClick}
+                            toggleFavorite={toggleFavorite}
+                            handleDelete={handleDelete}
+                        />
+                    ))}
+                </div>
+            )}
+        </>
+    );
+}
+
 export function NotionSidebar() {
     const [notes, setNotes] = useState<Note[]>([]);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
     const pathname = usePathname();
     const router = useRouter();
 
@@ -92,8 +215,34 @@ export function NotionSidebar() {
         }
     };
 
-    const favoriteNotes = notes.filter(n => n.isFavorite);
-    const privateNotes = notes.filter(n => !n.isFavorite);
+    // Toggle expand/collapse for a note
+    const toggleExpanded = (e: React.MouseEvent, noteId: string) => {
+        e.stopPropagation();
+        setExpandedNotes(prev => {
+            const next = new Set(prev);
+            if (next.has(noteId)) {
+                next.delete(noteId);
+            } else {
+                next.add(noteId);
+            }
+            return next;
+        });
+    };
+
+    // Get child notes for a given parent (by parentId)
+    const getChildNotes = (parentId: string): Note[] => {
+        return notes.filter(n => n.parentId === parentId);
+    };
+
+    // Check if a note has children
+    const hasChildren = (noteId: string): boolean => {
+        return notes.some(n => n.parentId === noteId);
+    };
+
+    // Filter for root-level notes (no parentId)
+    const rootNotes = notes.filter(n => !n.parentId);
+    const favoriteNotes = rootNotes.filter(n => n.isFavorite);
+    const privateNotes = rootNotes.filter(n => !n.isFavorite);
 
     return (
         <div className="w-60 h-full bg-[#F7F7F5] dark:bg-[#202020] flex flex-col font-sans text-[#37352f] dark:text-[#d4d4d4] group/sidebar">
@@ -162,56 +311,21 @@ export function NotionSidebar() {
                     </div>
 
                     <div className="space-y-[1px]">
-                        {privateNotes.map((note) => {
-                            const isActive = pathname === `/notes/${note.id}`;
-                            return (
-                                <div
-                                    key={note.id}
-                                    onClick={() => handleNoteClick(note.id)}
-                                    className={cn(
-                                        "group flex items-center gap-2 px-3 py-1 min-h-[28px] text-sm cursor-pointer rounded-sm transition-colors",
-                                        isActive
-                                            ? "bg-black/5 dark:bg-white/10 text-foreground font-medium"
-                                            : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
-                                    )}
-                                >
-                                    <div className="flex items-center justify-center w-4 h-4 shrink-0">
-                                        <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
-                                    </div>
-
-                                    <div className="flex items-center justify-center w-4 h-4 shrink-0 text-foreground/80">
-                                        {note.iconEmoji ? (
-                                            <span className="text-xs">{note.iconEmoji}</span>
-                                        ) : (
-                                            <FileText className="w-4 h-4" />
-                                        )}
-                                    </div>
-
-                                    <span className="truncate flex-1">{note.title || 'Untitled'}</span>
-
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <div className="h-5 w-5 flex items-center justify-center rounded-sm hover:bg-black/10 dark:hover:bg-white/10">
-                                                    <MoreHorizontal className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-                                                </div>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="start" className="w-48">
-                                                <DropdownMenuItem onClick={(e) => toggleFavorite(e, note)}>
-                                                    <Star className="mr-2 h-4 w-4" />
-                                                    <span>Add to Favorites</span>
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={(e) => handleDelete(e, note.id)} className="text-red-600 focus:text-red-600">
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    <span>Delete</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {privateNotes.map((note) => (
+                            <NoteItemWithChildren
+                                key={note.id}
+                                note={note}
+                                level={0}
+                                pathname={pathname}
+                                expandedNotes={expandedNotes}
+                                hasChildren={hasChildren}
+                                getChildNotes={getChildNotes}
+                                toggleExpanded={toggleExpanded}
+                                handleNoteClick={handleNoteClick}
+                                toggleFavorite={toggleFavorite}
+                                handleDelete={handleDelete}
+                            />
+                        ))}
 
                         {privateNotes.length === 0 && (
                             <div className="px-3 py-2 text-xs text-muted-foreground italic pl-9">
@@ -228,56 +342,21 @@ export function NotionSidebar() {
                             <span>Favorites</span>
                         </div>
                         <div className="space-y-[1px]">
-                            {favoriteNotes.map((note) => {
-                                const isActive = pathname === `/notes/${note.id}`;
-                                return (
-                                    <div
-                                        key={note.id}
-                                        onClick={() => handleNoteClick(note.id)}
-                                        className={cn(
-                                            "group flex items-center gap-2 px-3 py-1 min-h-[28px] text-sm cursor-pointer rounded-sm transition-colors",
-                                            isActive
-                                                ? "bg-black/5 dark:bg-white/10 text-foreground font-medium"
-                                                : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
-                                        )}
-                                    >
-                                        <div className="flex items-center justify-center w-4 h-4 shrink-0">
-                                            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
-                                        </div>
-
-                                        <div className="flex items-center justify-center w-4 h-4 shrink-0 text-foreground/80">
-                                            {note.iconEmoji ? (
-                                                <span className="text-xs">{note.iconEmoji}</span>
-                                            ) : (
-                                                <FileText className="w-4 h-4" />
-                                            )}
-                                        </div>
-
-                                        <span className="truncate flex-1">{note.title || 'Untitled'}</span>
-
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <div className="h-5 w-5 flex items-center justify-center rounded-sm hover:bg-black/10 dark:hover:bg-white/10">
-                                                        <MoreHorizontal className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-                                                    </div>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="start" className="w-48">
-                                                    <DropdownMenuItem onClick={(e) => toggleFavorite(e, note)}>
-                                                        <Star className="mr-2 h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                                        <span>Remove from Favorites</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={(e) => handleDelete(e, note.id)} className="text-red-600 focus:text-red-600">
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        <span>Delete</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {favoriteNotes.map((note) => (
+                                <NoteItemWithChildren
+                                    key={note.id}
+                                    note={note}
+                                    level={0}
+                                    pathname={pathname}
+                                    expandedNotes={expandedNotes}
+                                    hasChildren={hasChildren}
+                                    getChildNotes={getChildNotes}
+                                    toggleExpanded={toggleExpanded}
+                                    handleNoteClick={handleNoteClick}
+                                    toggleFavorite={toggleFavorite}
+                                    handleDelete={handleDelete}
+                                />
+                            ))}
                         </div>
                     </div>
                 )}
