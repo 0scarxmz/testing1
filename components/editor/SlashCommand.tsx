@@ -25,7 +25,7 @@ export interface CommandItem {
     command: (props: { editor: any; range: any }) => void;
 }
 
-const getSuggestionItems = ({ query, onCreatePage }: { query: string; onCreatePage?: () => Promise<string | null> }): CommandItem[] => {
+const getSuggestionItems = ({ query, onNavigateToPage }: { query: string; onNavigateToPage?: (pageId: string) => void }): CommandItem[] => {
     const items: CommandItem[] = [
         {
             title: 'Heading 1',
@@ -53,7 +53,7 @@ const getSuggestionItems = ({ query, onCreatePage }: { query: string; onCreatePa
         },
         {
             title: 'Bullet List',
-            description: 'Create a simple bullet list',
+            description: 'Create a bullet list',
             icon: List,
             command: ({ editor, range }) => {
                 editor.chain().focus().deleteRange(range).toggleBulletList().run();
@@ -69,7 +69,7 @@ const getSuggestionItems = ({ query, onCreatePage }: { query: string; onCreatePa
         },
         {
             title: 'Quote',
-            description: 'Capture a quote',
+            description: 'Create a blockquote',
             icon: Quote,
             command: ({ editor, range }) => {
                 editor.chain().focus().deleteRange(range).toggleBlockquote().run();
@@ -77,7 +77,7 @@ const getSuggestionItems = ({ query, onCreatePage }: { query: string; onCreatePa
         },
         {
             title: 'Code Block',
-            description: 'Capture a code snippet',
+            description: 'Add a code block',
             icon: Code,
             command: ({ editor, range }) => {
                 editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
@@ -93,19 +93,23 @@ const getSuggestionItems = ({ query, onCreatePage }: { query: string; onCreatePa
         },
         {
             title: 'Page',
-            description: 'Create a nested page',
+            description: 'Create a sub-page',
             icon: FileText,
-            command: async ({ editor, range }) => {
-                // Delete the slash command text first
-                editor.chain().focus().deleteRange(range).run();
+            command: ({ editor, range }) => {
+                // Generate unique page ID
+                const pageId = `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-                // Create the nested page via callback
-                if (onCreatePage) {
-                    const newPageId = await onCreatePage();
-                    if (newPageId) {
-                        // Insert a page block linking to the new note
-                        editor.chain().focus().insertPageBlock(newPageId, 'Untitled').run();
-                    }
+                // Insert the page block
+                editor.chain().focus().deleteRange(range).insertContent({
+                    type: 'pageBlock',
+                    attrs: { id: pageId, title: 'Untitled', pageContent: '' },
+                }).run();
+
+                // Navigate to the sub-page after a short delay
+                if (onNavigateToPage) {
+                    setTimeout(() => {
+                        onNavigateToPage(pageId);
+                    }, 200);
                 }
             },
         },
@@ -128,7 +132,7 @@ export const SlashCommand = Extension.create({
                     props.command({ editor, range });
                 },
             },
-            onCreatePage: undefined as (() => Promise<string | null>) | undefined,
+            onNavigateToPage: undefined as ((pageId: string) => void) | undefined,
         };
     },
 
@@ -138,7 +142,7 @@ export const SlashCommand = Extension.create({
                 editor: this.editor,
                 ...this.options.suggestion,
                 items: ({ query }: { query: string }) => {
-                    return getSuggestionItems({ query, onCreatePage: this.options.onCreatePage });
+                    return getSuggestionItems({ query, onNavigateToPage: this.options.onNavigateToPage });
                 },
                 render: () => {
                     let component: ReactRenderer | null = null;

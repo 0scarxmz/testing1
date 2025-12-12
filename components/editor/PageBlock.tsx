@@ -6,17 +6,23 @@ import { PageBlockComponent } from './PageBlockComponent';
 
 export interface PageBlockOptions {
     HTMLAttributes: Record<string, any>;
+    onNavigateToPage?: (pageId: string, noteId: string) => void;
 }
 
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
         pageBlock: {
             /**
-             * Insert a page block linking to a note
+             * Insert a sub-page block with its own content
              */
-            insertPageBlock: (pageId: string, title?: string) => ReturnType;
+            insertPageBlock: () => ReturnType;
         };
     }
+}
+
+// Generate a unique ID for each page block
+function generatePageId(): string {
+    return `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export const PageBlock = Node.create<PageBlockOptions>({
@@ -24,21 +30,38 @@ export const PageBlock = Node.create<PageBlockOptions>({
 
     group: 'block',
 
-    atom: true, // Atomic node - no editable content inside
+    atom: true, // Atomic - content stored as attribute, not inline
 
     addOptions() {
         return {
             HTMLAttributes: {},
+            onNavigateToPage: undefined,
         };
     },
 
     addAttributes() {
         return {
-            pageId: {
-                default: null, // ID of the linked note
+            id: {
+                default: null,
+                renderHTML: (attributes: any) => ({
+                    'data-id': attributes.id,
+                }),
+                parseHTML: (element: HTMLElement) => element.getAttribute('data-id'),
             },
             title: {
                 default: 'Untitled',
+                renderHTML: (attributes: any) => ({
+                    'data-title': encodeURIComponent(attributes.title || 'Untitled'),
+                }),
+                parseHTML: (element: HTMLElement) => decodeURIComponent(element.getAttribute('data-title') || 'Untitled'),
+            },
+            // Sub-page content stored as markdown string
+            pageContent: {
+                default: '',
+                renderHTML: (attributes: any) => ({
+                    'data-page-content': encodeURIComponent(attributes.pageContent || ''),
+                }),
+                parseHTML: (element: HTMLElement) => decodeURIComponent(element.getAttribute('data-page-content') || ''),
             },
         };
     },
@@ -52,7 +75,7 @@ export const PageBlock = Node.create<PageBlockOptions>({
     },
 
     renderHTML({ HTMLAttributes }) {
-        return ['div', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { 'data-type': 'page-block' }), 0];
+        return ['div', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { 'data-type': 'page-block' })];
     },
 
     addNodeView() {
@@ -62,13 +85,20 @@ export const PageBlock = Node.create<PageBlockOptions>({
     addCommands() {
         return {
             insertPageBlock:
-                (pageId: string, title?: string) =>
+                () =>
                     ({ commands }) => {
+                        const pageId = generatePageId();
+                        console.log('[PageBlock] Creating new sub-page with ID:', pageId);
                         return commands.insertContent({
                             type: this.name,
-                            attrs: { pageId, title: title || 'Untitled' },
+                            attrs: {
+                                id: pageId,
+                                title: 'Untitled',
+                                pageContent: ''
+                            },
                         });
                     },
         };
     },
 });
+

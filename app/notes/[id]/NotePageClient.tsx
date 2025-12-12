@@ -311,22 +311,9 @@ export function NotePageClient() {
               content={content}
               onChange={setContent}
               editable={true}
-              onCreatePage={async () => {
-                try {
-                  // Create a nested page with parentId set to current note
-                  const parentId = isNew ? undefined : id;
-                  const newNote = await createNote({
-                    title: 'Untitled',
-                    content: '',
-                    tags: [],
-                    embedding: null,
-                    parentId: parentId, // Link to parent note
-                  });
-                  return newNote.id;
-                } catch (error) {
-                  console.error('Failed to create nested page:', error);
-                  return null;
-                }
+              onNavigateToPage={(pageId) => {
+                // Navigate to the sub-page editing view
+                router.push(`/notes/${id}/page/${pageId}`);
               }}
             />
           </div>

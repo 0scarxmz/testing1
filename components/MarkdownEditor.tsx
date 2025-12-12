@@ -14,10 +14,10 @@ interface MarkdownEditorProps {
   onChange: (content: string) => void; // Always receives Markdown format
   placeholder?: string;
   editable?: boolean;
-  onCreatePage?: () => Promise<string | null>; // For /page command
+  onNavigateToPage?: (pageId: string) => void; // For navigating to sub-pages
 }
 
-export function MarkdownEditor({ content, onChange, placeholder = 'Start writing...', editable = true, onCreatePage }: MarkdownEditorProps) {
+export function MarkdownEditor({ content, onChange, placeholder = 'Start writing...', editable = true, onNavigateToPage }: MarkdownEditorProps) {
   // Normalize content to Markdown (convert HTML if needed)
   const markdownContent = normalizeToMarkdown(content);
 
@@ -32,7 +32,7 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
         allowBase64: true,
       }),
       SlashCommand.configure({
-        onCreatePage,
+        onNavigateToPage,
       }),
       PageBlock,
     ],

@@ -1,44 +1,27 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
-import { FileText, ArrowUpRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { getNote } from '@/lib/storage';
-import type { Note } from '@/types/note';
+import { FileText, ChevronRight } from 'lucide-react';
+import { useRouter, useParams } from 'next/navigation';
 
-export function PageBlockComponent({ node, updateAttributes, selected }: any) {
+export function PageBlockComponent({ node, updateAttributes, editor }: any) {
     const router = useRouter();
-    const pageId = node.attrs.pageId;
+    const params = useParams();
+    const noteId = params?.id as string;
+
+    const pageId = node.attrs.id;
     const [title, setTitle] = useState(node.attrs.title || 'Untitled');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [linkedNote, setLinkedNote] = useState<Note | null>(null);
-
-    // Load the linked note to get the latest title
-    useEffect(() => {
-        if (pageId) {
-            getNote(pageId).then((note) => {
-                if (note) {
-                    setLinkedNote(note);
-                    // Update title from linked note if different
-                    if (note.title && note.title !== title) {
-                        setTitle(note.title);
-                        updateAttributes({ title: note.title });
-                    }
-                }
-            }).catch((err) => {
-                console.error('Failed to load linked note:', err);
-            });
-        }
-    }, [pageId, title, updateAttributes]);
 
     const handleClick = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (pageId) {
-            router.push(`/notes/${pageId}`);
+        if (pageId && noteId) {
+            // Navigate to sub-page editing view
+            router.push(`/notes/${noteId}/page/${pageId}`);
         }
-    }, [pageId, router]);
+    }, [pageId, noteId, router]);
 
     const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setTitle(e.target.value);
@@ -55,33 +38,21 @@ export function PageBlockComponent({ node, updateAttributes, selected }: any) {
             setIsEditingTitle(false);
             updateAttributes({ title: title || 'Untitled' });
         }
-    }, [title, updateAttributes]);
-
-    // If no pageId, show a placeholder
-    if (!pageId) {
-        return (
-            <NodeViewWrapper className="page-block my-2">
-                <div className="flex items-center gap-2 px-3 py-2 border border-dashed border-border/50 rounded-lg bg-muted/10 text-muted-foreground">
-                    <FileText className="w-4 h-4" />
-                    <span className="text-sm italic">Invalid page link</span>
-                </div>
-            </NodeViewWrapper>
-        );
-    }
+        if (e.key === 'Escape') {
+            setIsEditingTitle(false);
+            setTitle(node.attrs.title || 'Untitled');
+        }
+    }, [title, updateAttributes, node.attrs.title]);
 
     return (
         <NodeViewWrapper className="page-block my-2">
             <div
-                className={`group flex items-center gap-2 px-3 py-2 border border-border/50 rounded-lg bg-muted/20 hover:bg-muted/40 cursor-pointer transition-all select-none ${selected ? 'ring-2 ring-primary/30' : ''}`}
+                className="group flex items-center gap-2 px-3 py-2.5 border border-border/50 rounded-lg bg-muted/20 hover:bg-muted/40 cursor-pointer transition-all select-none"
                 onClick={handleClick}
             >
                 {/* Icon */}
                 <div className="flex items-center justify-center w-5 h-5 text-muted-foreground shrink-0">
-                    {linkedNote?.iconEmoji ? (
-                        <span className="text-base">{linkedNote.iconEmoji}</span>
-                    ) : (
-                        <FileText className="w-4 h-4" />
-                    )}
+                    <FileText className="w-4 h-4" />
                 </div>
 
                 {/* Title */}
@@ -98,18 +69,18 @@ export function PageBlockComponent({ node, updateAttributes, selected }: any) {
                     />
                 ) : (
                     <span
-                        className="flex-1 text-sm font-medium text-foreground/90 truncate"
+                        className="flex-1 text-sm font-medium text-foreground/90"
                         onDoubleClick={(e) => {
                             e.stopPropagation();
                             setIsEditingTitle(true);
                         }}
                     >
-                        {linkedNote?.title || title || 'Untitled'}
+                        {title}
                     </span>
                 )}
 
                 {/* Arrow indicator */}
-                <ArrowUpRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
             </div>
         </NodeViewWrapper>
     );
