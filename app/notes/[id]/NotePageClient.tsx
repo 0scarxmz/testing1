@@ -273,13 +273,20 @@ export function NotePageClient() {
               iconEmoji={iconEmoji}
               editable={true}
               onChange={async (data) => {
-                if (data.emoji !== undefined) {
+                // When emoji is selected (even if path is explicitly null)
+                if (data.emoji) {
                   setIconEmoji(data.emoji);
                   setIconPath(null);
                 }
-                if (data.path !== undefined) {
+                // When path is selected (even if emoji is explicitly null)
+                else if (data.path) {
                   setIconPath(data.path);
                   setIconEmoji(null);
+                }
+                // Reset to default (both null)
+                else if (data.emoji === null && data.path === null) {
+                  setIconEmoji(null);
+                  setIconPath(null);
                 }
               }}
             />
